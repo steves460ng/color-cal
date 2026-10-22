@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+    <meta name="description" content="Color Cal 프로젝트의 시작 페이지">
+    <title>Color Cal</title>
+    <style>
+      * { box-sizing: border-box; }
+      body { margin: 0; min-height: 100svh; display: grid; place-items: center; padding: 24px; font-family: system-ui, sans-serif; background: #f5f3ff; color: #26213c; }
+      main { width: min(100%, 560px); padding: clamp(24px, 6vw, 48px); border-radius: 24px; background: #fff; box-shadow: 0 16px 64px #50339914; }
+      .colors { display: flex; gap: 10px; margin-bottom: 28px; }
+      .colors span { width: 28px; height: 28px; border-radius: 50%; background: var(--color); }
+      h1 { margin: 0 0 16px; font-size: clamp(36px, 8vw, 56px); letter-spacing: -.04em; }
+      p { margin: 0; line-height: 1.8; color: #625b76; }
+      a { display: inline-block; margin-top: 28px; color: #6441c8; text-underline-offset: 4px; }
+      a:focus-visible { outline: 3px solid #6441c8; outline-offset: 6px; }
+      @media (prefers-color-scheme: dark) {
+        body { background: #181522; color: #f5f3ff; }
+        main { background: #262133; }
+        p { color: #c4bdd5; }
+        a { color: #bba4ff; }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <div class="colors" aria-hidden="true"><span style="--color:#a78bfa"></span><span style="--color:#fb7185"></span><span style="--color:#fbbf24"></span><span style="--color:#34d399"></span></div>
+      <h1>Color Cal</h1>
+      <p>Color Cal에 오신 것을 환영합니다.<br>프로젝트의 첫 페이지입니다.</p>
+      <a href="https://github.com/steves460ng/color-cal">GitHub 저장소 보기</a>
+    </main>
+  </body>
+</html>
