@@ -750,13 +750,6 @@ h3 {
   font-size: 16px;
   font-weight: 750;
 }
-.guide-value-fixed {
-  color: #7b8595;
-}
-.guide-zero small {
-  font-size: 10px;
-  margin-left: 4px;
-}
 .guide-row-channel {
   display: inline-flex;
   align-items: center;

@@ -280,9 +280,7 @@ function guidePage(second) {
     "",
     "guide-channel",
     ...(second ? ["", ""] : []),
-    ...CHANNELS.map((ch) =>
-      ch === c ? "guide-value-active" : "guide-value-fixed",
-    ),
+    "guide-value-active",
     ...(second ? [""] : []),
   ];
   return (
@@ -305,10 +303,7 @@ function guidePage(second) {
           "패치 ID",
           "제작 채널",
           ...(second ? ["목표 계조", "내부 계산값"] : []),
-          ...CHANNELS.map(
-            (ch) =>
-              `<span class="guide-column-label">${badge(ch)} ${names[ch]}</span><span class="guide-column-role">${ch === c ? "제작 입력 (%)" : "0% 고정"}</span>`,
-          ),
+          `<span class="guide-column-label">${badge(c)} ${names[c]}</span><span class="guide-column-role">제작 입력 (%)</span>`,
           ...(second ? ["실제 제작 입력값 (%)"] : []),
         ],
         ts.map((r, i) => {
@@ -319,11 +314,7 @@ function guidePage(second) {
               patchId(c, r.target, second ? 2 : 1, v?.number),
               `<span class="guide-row-channel">${badge(c)} ${names[c]}</span>`,
               ...(second ? [`${r.target}%`, fmt(r.internal, 8)] : []),
-              ...CHANNELS.map((ch) =>
-                ch === c
-                  ? `<strong class="guide-production">${prodFmt(r.production, s)}</strong>`
-                  : '<span class="guide-zero">0 <small>고정</small></span>',
-              ),
+              `<strong class="guide-production">${prodFmt(r.production, s)}</strong>`,
               ...(second
                 ? [
                     actualValid(actual, s)
@@ -338,7 +329,7 @@ function guidePage(second) {
         {
           className: "guide-table",
           classes,
-          caption: `${second ? "2차" : "1차"} 패치 제작 가이드 · ${c} (${names[c]}) 채널 · ${fixed} 0% 고정`,
+          caption: `${second ? "2차" : "1차"} 패치 제작 가이드 · ${c} (${names[c]}) 채널`,
         },
       )}
     </section>`
