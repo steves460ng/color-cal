@@ -1,0 +1,63 @@
+name: Test static application
+on:
+  push:
+    branches: [main]
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  unit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: npm test
+  browser:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: [chromium, firefox, msedge]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: color-cal
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: color-cal/package-lock.json
+      - run: npm ci
+        working-directory: color-cal
+      - run: npx playwright install --with-deps ${{ matrix.browser }}
+        working-directory: color-cal
+      - name: Serve under project subpath
+        run: |
+          python3 -m http.server 8000 --bind 127.0.0.1 > /tmp/color-cal-server.log 2>&1 &
+          for attempt in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:8000/color-cal/ > /dev/null; then exit 0; fi
+            sleep 1
+          done
+          cat /tmp/color-cal-server.log
+          exit 1
+      - run: npm run test:browser
+        working-directory: color-cal
+        env:
+          BASE_URL: http://127.0.0.1:8000/color-cal/
+          BROWSER: ${{ matrix.browser }}
+      - name: Storage and recovery checks
+        if: matrix.browser == 'chromium'
+        run: |
+          npm run test:resilience
+          npm run test:persistence
+        working-directory: color-cal
+        env:
+          BASE_URL: http://127.0.0.1:8000/color-cal/
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: browser-${{ matrix.browser }}
+          path: color-cal/test-results/
+          if-no-files-found: ignore

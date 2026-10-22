@@ -1,0 +1,62 @@
+@media print {
+  .topbar,
+  aside,
+  .toolbar,
+  .tabs,
+  .no-print,
+  #toast,
+  .skip {
+    display: none !important;
+  }
+  .shell {
+    display: block !important;
+  }
+  main {
+    max-width: none !important;
+    padding: 0 !important;
+  }
+  .card {
+    border: 0 !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+  }
+  .table-wrap {
+    max-height: none !important;
+    overflow: visible !important;
+    border: 0 !important;
+  }
+  body {
+    background: white !important;
+    color: black !important;
+  }
+  th {
+    position: static !important;
+  }
+  tr {
+    break-inside: avoid;
+  }
+  table {
+    font-size: 9pt !important;
+  }
+  th,
+  td {
+    padding: 6px !important;
+  }
+  h1 {
+    font-size: 18pt !important;
+  }
+  .notice {
+    border: 1px solid #aaa !important;
+    background: white !important;
+  }
+  a {
+    color: black !important;
+  }
+  .metrics {
+    display: none !important;
+  }
+  @page {
+    size: A4 landscape;
+    margin: 12mm;
+  }
+}

@@ -1,35 +1,59 @@
 <!doctype html>
 <html lang="ko">
   <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="color-scheme" content="light dark">
-    <meta name="description" content="Color Cal 프로젝트의 시작 페이지">
-    <title>Color Cal</title>
-    <style>
-      * { box-sizing: border-box; }
-      body { margin: 0; min-height: 100svh; display: grid; place-items: center; padding: 24px; font-family: system-ui, sans-serif; background: #f5f3ff; color: #26213c; }
-      main { width: min(100%, 560px); padding: clamp(24px, 6vw, 48px); border-radius: 24px; background: #fff; box-shadow: 0 16px 64px #50339914; }
-      .colors { display: flex; gap: 10px; margin-bottom: 28px; }
-      .colors span { width: 28px; height: 28px; border-radius: 50%; background: var(--color); }
-      h1 { margin: 0 0 16px; font-size: clamp(36px, 8vw, 56px); letter-spacing: -.04em; }
-      p { margin: 0; line-height: 1.8; color: #625b76; }
-      a { display: inline-block; margin-top: 28px; color: #6441c8; text-underline-offset: 4px; }
-      a:focus-visible { outline: 3px solid #6441c8; outline-offset: 6px; }
-      @media (prefers-color-scheme: dark) {
-        body { background: #181522; color: #f5f3ff; }
-        main { background: #262133; }
-        p { color: #c4bdd5; }
-        a { color: #bba4ff; }
-      }
-    </style>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="description"
+      content="CMYK 단색 측정, 계조 보정 및 검증 작업실"
+    />
+    <meta name="theme-color" content="#171f32" />
+    <title>Color Cal · CMYK 단색 캘리브레이션</title>
+    <link rel="stylesheet" href="./css/main.css" />
+    <script type="module" src="./js/app.js"></script>
   </head>
   <body>
-    <main>
-      <div class="colors" aria-hidden="true"><span style="--color:#a78bfa"></span><span style="--color:#fb7185"></span><span style="--color:#fbbf24"></span><span style="--color:#34d399"></span></div>
-      <h1>Color Cal</h1>
-      <p>Color Cal에 오신 것을 환영합니다.<br>프로젝트의 첫 페이지입니다.</p>
-      <a href="https://github.com/steves460ng/color-cal">GitHub 저장소 보기</a>
-    </main>
+    <a class="skip" href="#content">본문으로 이동</a>
+    <header class="topbar">
+      <a class="brand" href="#projects"
+        ><span class="brand-icon" aria-hidden="true">▥</span> Color Cal
+        <small>단색 캘리브레이션 작업실</small></a
+      >
+      <div class="top-actions">
+        <span id="active-project"></span
+        ><span id="save-status" role="status">저장소 연결 중…</span
+        ><button id="backup" type="button">JSON 백업</button
+        ><button id="restore" type="button">복원</button
+        ><input
+          id="restore-file"
+          type="file"
+          accept=".json,application/json"
+          hidden
+        />
+      </div>
+    </header>
+    <div class="shell">
+      <aside>
+        <label for="project-select">현재 프로젝트</label
+        ><select id="project-select" aria-label="현재 프로젝트"></select>
+        <div id="project-meta"></div>
+        <nav id="navigation" aria-label="작업 단계"></nav>
+        <div class="side-note">
+          <span class="channel c">C</span><span class="channel m">M</span
+          ><span class="channel y">Y</span><span class="channel k">K</span>
+          <p>단색 채널을 독립적으로 보정합니다.</p>
+          <p>
+            측정 데이터는 이 브라우저에 저장됩니다. 정기적으로 JSON 백업을
+            내려받으세요.
+          </p>
+        </div>
+      </aside>
+      <main id="content" tabindex="-1"><p>작업실을 준비하고 있습니다.</p></main>
+    </div>
+    <div id="toast" role="status" aria-live="polite"></div>
+    <noscript
+      >이 앱은 JavaScript가 필요합니다. 브라우저 설정에서
+      활성화하세요.</noscript
+    >
   </body>
 </html>
