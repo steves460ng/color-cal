@@ -124,11 +124,12 @@ function heading(title, subtitle, step) {
 function notice(text, kind = "") {
   return `<div class="notice ${kind}">${text}</div>`;
 }
-function table(headers, rows) {
-  return `<div class="table-wrap"><table><thead><tr>${headers.map((h) => `<th scope="col">${h}</th>`).join("")}</tr></thead><tbody>${rows.join("")}</tbody></table></div>`;
+function table(headers, rows, options = {}) {
+  const classes = options.classes || [];
+  return `<div class="table-wrap"><table${options.className ? ` class="${options.className}"` : ""}>${options.caption ? `<caption>${esc(options.caption)}</caption>` : ""}<thead><tr>${headers.map((h, i) => `<th scope="col"${classes[i] ? ` class="${classes[i]}"` : ""}>${h}</th>`).join("")}</tr></thead><tbody>${rows.join("")}</tbody></table></div>`;
 }
-function row(values) {
-  return `<tr>${values.map((v) => `<td>${v}</td>`).join("")}</tr>`;
+function row(values, classes = []) {
+  return `<tr>${values.map((v, i) => `<td${classes[i] ? ` class="${classes[i]}"` : ""}>${v}</td>`).join("")}</tr>`;
 }
 function badge(c) {
   return `<span class="channel ${c.toLowerCase()}">${c}</span>`;
@@ -267,11 +268,23 @@ function guidePage(second) {
       heading("2차 패치 가이드", "보정값을 계산한 후 제작할 수 있습니다.", 7) +
       empty("보정 테이블이 없습니다.", "correction", "보정값 계산하기")
     );
+  const names = { C: "시안", M: "마젠타", Y: "옐로", K: "블랙" };
   const c = channel(second),
-    s = second ? v.settings : p.settings,
-    ts = second
-      ? v.tables[c]
-      : targets(s).map((t) => ({ target: t, production: t, internal: t }));
+    s = second ? v.settings : p.settings;
+  const ts = second
+    ? v.tables[c]
+    : targets(s).map((t) => ({ target: t, production: t, internal: t }));
+  const fixed = CHANNELS.filter((ch) => ch !== c).join(" · ");
+  const classes = [
+    "",
+    "",
+    "guide-channel",
+    ...(second ? ["", ""] : []),
+    ...CHANNELS.map((ch) =>
+      ch === c ? "guide-value-active" : "guide-value-fixed",
+    ),
+    ...(second ? [""] : []),
+  ];
   return (
     heading(
       `${second ? "2차 보정" : "1차"} 패치 제작 가이드`,
@@ -280,36 +293,58 @@ function guidePage(second) {
     ) +
     (second ? versionToolbar() + versionNotice(v) : "") +
     tabs(second) +
-    `<section class="card"><div class="card-head"><div><h2>${badge(c)} ${second ? "보정 패치" : "기본 패치"} 목록 ${second ? `· V${v.number}` : ""}</h2><span class="muted">채널당 ${ts.length}개 · 전체 ${(second ? v.channels : s.channels).length * ts.length}개 · ${s.integer ? "정수" : "소수"} 제작값</span></div><span class="badge">${second ? "2차" : "1차"} 제작</span></div>${notice("용지·잉크·출력 해상도·RIP 및 측색 조건을 두 측정에서 동일하게 유지하세요. 패치 ID와 측정 순서를 함께 기록하고, 충분히 건조한 뒤 측정하세요.")}<div class="toolbar no-print"><button id="copy-guide">제작값 복사</button><button id="print-guide">현재 채널 가이드 인쇄</button><a href="#${second ? "measure2" : "measure1"}">측정값 입력 →</a></div>${table(
-      [
-        "순서",
-        "패치 ID",
-        ...(second ? ["목표 계조", "내부 계산값"] : []),
-        "C (%)",
-        "M (%)",
-        "Y (%)",
-        "K (%)",
-        ...(second ? ["실제 제작 입력값 (%)"] : []),
-      ],
-      ts.map((r, i) => {
-        const actual = v?.second[key(c, r.target)]?.actual;
-        return row([
-          i + 1,
-          patchId(c, r.target, second ? 2 : 1, v?.number),
-          ...(second ? [`${r.target}%`, fmt(r.internal, 8)] : []),
-          ...CHANNELS.map((ch) => prodFmt(ch === c ? r.production : 0, s)),
-          ...(second
-            ? [
-                actualValid(actual, s)
-                  ? prodFmt(actual, s)
-                  : "미기록 또는 유효하지 않음 · 2차 입력에서 기록",
-              ]
-            : []),
-        ]);
-      }),
-    )}</section>`
+    `<section class="card patch-guide guide-${c.toLowerCase()}">
+      <div class="card-head"><div><h2>${badge(c)} ${c} · ${names[c]} 단색 패치 ${second ? `· 보정 V${v.number}` : "· 1차 제작"}</h2><span class="muted">현재 채널 ${ts.length}개 · 전체 ${(second ? v.channels : s.channels).length * ts.length}개 · ${s.integer ? "정수" : "소수"} 제작값</span></div><span class="badge">${second ? "2차" : "1차"} 제작</span></div>
+      <div class="guide-context"><strong>${c} 채널의 제작 입력값만 변경하세요.</strong><span>${fixed} 채널은 모든 패치에서 0% 고정입니다.</span></div>
+      <p class="muted">아래는 패치 제작 수치입니다. Lab 측정 내역과 완료 여부는 <a href="#${second ? "measure2" : "measure1"}">${second ? "2차" : "1차"} 측정 입력</a>에서 확인하세요.</p>
+      ${notice("용지·잉크·출력 해상도·RIP 및 측색 조건을 두 측정에서 동일하게 유지하세요. 패치 ID와 측정 순서를 함께 기록하고, 충분히 건조한 뒤 측정하세요.")}
+      <div class="toolbar no-print"><button id="copy-guide">제작값 복사</button><button id="print-guide">현재 채널 가이드 인쇄</button><a href="#${second ? "measure2" : "measure1"}">측정값 입력 →</a></div>
+      ${table(
+        [
+          "순서",
+          "패치 ID",
+          "제작 채널",
+          ...(second ? ["목표 계조", "내부 계산값"] : []),
+          ...CHANNELS.map(
+            (ch) =>
+              `<span class="guide-column-label">${badge(ch)} ${names[ch]}</span><span class="guide-column-role">${ch === c ? "제작 입력 (%)" : "0% 고정"}</span>`,
+          ),
+          ...(second ? ["실제 제작 입력값 (%)"] : []),
+        ],
+        ts.map((r, i) => {
+          const actual = v?.second[key(c, r.target)]?.actual;
+          return row(
+            [
+              i + 1,
+              patchId(c, r.target, second ? 2 : 1, v?.number),
+              `<span class="guide-row-channel">${badge(c)} ${names[c]}</span>`,
+              ...(second ? [`${r.target}%`, fmt(r.internal, 8)] : []),
+              ...CHANNELS.map((ch) =>
+                ch === c
+                  ? `<strong class="guide-production">${prodFmt(r.production, s)}</strong>`
+                  : '<span class="guide-zero">0 <small>고정</small></span>',
+              ),
+              ...(second
+                ? [
+                    actualValid(actual, s)
+                      ? prodFmt(actual, s)
+                      : "미기록 또는 유효하지 않음 · 2차 입력에서 기록",
+                  ]
+                : []),
+            ],
+            classes,
+          );
+        }),
+        {
+          className: "guide-table",
+          classes,
+          caption: `${second ? "2차" : "1차"} 패치 제작 가이드 · ${c} (${names[c]}) 채널 · ${fixed} 0% 고정`,
+        },
+      )}
+    </section>`
   );
 }
+
 function inputCell(field, value, id, c, t, second, disabled) {
   const valid =
     value === "" || value === undefined || value === null

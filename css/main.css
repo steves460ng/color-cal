@@ -682,3 +682,108 @@ h2,
 h3 {
   overflow-wrap: anywhere;
 }
+
+/* A guide's channel identity stays with its rows and sticky column headers. */
+.guide-c {
+  --guide-ink: #006b82;
+  --guide-tint: #edfafe;
+  --guide-border: #74c7db;
+}
+.guide-m {
+  --guide-ink: #97305e;
+  --guide-tint: #fff1f8;
+  --guide-border: #df9aba;
+}
+.guide-y {
+  --guide-ink: #775800;
+  --guide-tint: #fff9df;
+  --guide-border: #d5b85a;
+}
+.guide-k {
+  --guide-ink: #303b50;
+  --guide-tint: #edf0f5;
+  --guide-border: #9da9bc;
+}
+.guide-context {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 24px;
+  padding: 14px 16px;
+  margin-top: 18px;
+  border-left: 4px solid var(--guide-ink);
+  background: var(--guide-tint);
+  color: var(--guide-ink);
+  line-height: 1.7;
+}
+.guide-table caption {
+  padding: 12px 14px;
+  text-align: left;
+  font-size: 12px;
+  font-weight: 650;
+  color: var(--guide-ink);
+  background: var(--guide-tint);
+}
+.guide-table .guide-value-active {
+  background: var(--guide-tint);
+  color: var(--guide-ink);
+  border-left: 2px solid var(--guide-border);
+  border-right: 2px solid var(--guide-border);
+}
+.guide-table th.guide-value-active {
+  box-shadow: inset 0 3px var(--guide-ink);
+}
+.guide-column-label,
+.guide-column-role {
+  display: block;
+}
+.guide-column-label {
+  color: #33425d;
+}
+.guide-column-role {
+  margin-top: 6px;
+  font-size: 11px;
+}
+.guide-value-active .guide-column-role {
+  font-weight: 750;
+}
+.guide-production {
+  font-size: 16px;
+  font-weight: 750;
+}
+.guide-value-fixed {
+  color: #7b8595;
+}
+.guide-zero small {
+  font-size: 10px;
+  margin-left: 4px;
+}
+.guide-row-channel {
+  display: inline-flex;
+  align-items: center;
+  white-space: nowrap;
+  font-weight: 650;
+  color: var(--guide-ink);
+}
+.guide-table .channel {
+  width: 21px;
+  height: 21px;
+  font-size: 11px;
+}
+@media print {
+  .guide-context,
+  .guide-table caption {
+    color: black !important;
+    background: white !important;
+  }
+  .guide-table .guide-value-active {
+    color: black !important;
+    border-left: 2px solid black;
+    border-right: 2px solid black;
+  }
+  .guide-table th.guide-value-active {
+    box-shadow: none;
+  }
+  .guide-row-channel {
+    color: black;
+  }
+}
