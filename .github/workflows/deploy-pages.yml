@@ -1,0 +1,46 @@
+name: Deploy GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Validate calibration rules
+        run: npm test
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+      - name: Prepare static site
+        run: |
+          mkdir -p "$RUNNER_TEMP/color-cal-site"
+          cp index.html .nojekyll "$RUNNER_TEMP/color-cal-site/"
+          cp -R css js "$RUNNER_TEMP/color-cal-site/"
+          test -s "$RUNNER_TEMP/color-cal-site/index.html"
+          test -s "$RUNNER_TEMP/color-cal-site/js/app.js"
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ${{ runner.temp }}/color-cal-site
+      - name: Deploy GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

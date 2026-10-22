@@ -51,12 +51,12 @@ npm run test:persistence
 
 ## GitHub Pages 배포
 
-빌드 과정은 없습니다. `main`의 루트 파일을 그대로 배포합니다.
+앱 빌드 과정은 없습니다. `.github/workflows/deploy-pages.yml`이 테스트 후 앱 파일만 Pages 아티팩트로 업로드하고 배포합니다.
 
 1. GitHub 저장소 **Settings → Pages**를 엽니다.
-2. **Deploy from a branch**를 선택합니다.
-3. **main / (root)**를 선택하고 저장합니다.
-4. Pages 배포 작업이 완료되면 `https://steves460ng.github.io/color-cal/`에서 확인합니다.
+2. **Build and deployment → Source → GitHub Actions**를 선택합니다.
+3. **Actions → Deploy GitHub Pages → Run workflow → main**을 선택해 실행합니다. 이후 `main` 푸시마다 자동 배포합니다.
+4. **Deploy GitHub Pages** 작업이 성공하면 `https://steves460ng.github.io/color-cal/`에서 확인합니다.
 
 `.nojekyll`이 포함되어 있습니다. 테스트에 사용하는 `node_modules/`, `test-results/`는 Git에 포함하지 않습니다. 이 환경에서는 GitHub 설정 API 접근이 차단되어 Pages 설정 변경과 공개 URL의 배포 완료 여부를 검증하지 못했습니다. 파일 푸시나 CI 설정 자체가 공개 배포 성공을 뜻하지는 않습니다.
 
