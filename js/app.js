@@ -12,6 +12,7 @@ import {
   firstComplete,
   calculateVersion,
   prepareSecondPass,
+  reusableVersion,
   updateProjectMetadata,
   versionCurrent,
   confirmVersion,
@@ -29,6 +30,8 @@ import {
 } from "./storage/indexeddb.js";
 import { backupText, parseBackup, csv, download } from "./storage/backup.js";
 import { drawChart } from "./ui/charts.js";
+import { firstPassReport } from "./domain/linearity.js";
+import { renderLinearityReport } from "./ui/linearity-report.js";
 import { formatInput } from "./ui/formatters.js";
 import { createSaveQueue } from "./storage/save-queue.js";
 
@@ -37,7 +40,7 @@ const routes = [
   ["settings", "측정 설정"],
   ["guide1", "1차 패치 가이드"],
   ["measure1", "1차 측정 입력"],
-  ["results1", "1차 측정 결과"],
+  ["results1", "1차 선형도 리포트"],
   ["correction", "보정 테이블·버전 (상세)"],
   ["guide2", "2차 패치 가이드"],
   ["measure2", "2차 측정 입력"],
@@ -356,11 +359,24 @@ function inputCell(field, value, id, c, t, second, disabled) {
         : "유효한 숫자를 입력하세요";
   return `<input id="${id}-${field}" data-measure="${field}" data-target="${t}" data-channel="${c}" data-second="${second}" aria-label="${id} ${field === "actual" ? "실제 제작 입력값" : field + "*"}" type="number" value="${esc(value)}" step="${field === "actual" && version()?.settings.integer ? "1" : "any"}" ${field === "L" || field === "actual" ? 'min="0" max="100"' : ""} ${disabled ? "disabled" : ""} aria-invalid="${!valid}" aria-describedby="${id}-${field}-error"><span class="cell-error" id="${id}-${field}-error" ${valid ? "hidden" : ""}>${msg}</span>`;
 }
-function secondPreparation() {
+function secondPreparation(report = null) {
   const p = project(),
     missing = p.settings.channels.filter((c) => !firstComplete(p, c));
-  return `<div class="workflow-next"><div><h2>다음: 2차 보정 패치 제작·측정</h2><p class="muted">${missing.length ? `${missing.join(" · ")} 채널의 1차 측정을 마치면 진행할 수 있습니다.` : "1차 측정 완료. 보정값을 자동 계산하고 2차 제작 가이드로 이동합니다."} 기존 작업 버전이 있으면 이어서 진행합니다.</p></div><button class="primary" data-prepare-second ${missing.length ? "disabled" : ""}>2차 측정 준비 →</button></div>`;
+  const destination = report ? "guide2" : "results1";
+  const blocked = missing.length > 0 || (!!report && !report.canProceed);
+  const title = report
+    ? "다음: 2차 패치 제작·측정"
+    : "다음: 1차 선형도 진단 리포트";
+  const description = missing.length
+    ? `${missing.join(" · ")} 채널의 1차 측정을 마치면 진행할 수 있습니다.`
+    : report
+      ? report.canProceed
+        ? "원본 계조와 검토 구간을 확인했다면 가이드로 패치를 제작하고 2차 측정을 진행하세요."
+        : "계산할 수 없는 측정값을 먼저 확인하세요."
+      : "보정값을 자동 계산하고 원본의 선형도와 제작값을 리포트로 확인합니다.";
+  return `<div class="workflow-next"><div><h2>${title}</h2><p class="muted">${description} 기존 작업 버전은 보존하며 다시 방문해도 중복 생성하지 않습니다.</p></div><button class="primary" data-prepare-second data-destination="${destination}" ${blocked ? "disabled" : ""}>${report ? "2차 패치 제작으로 진행" : "1차 선형도 리포트 보기"} →</button></div>`;
 }
+
 function measurePage(second) {
   const p = project(),
     v = version();
@@ -406,7 +422,7 @@ function measurePage(second) {
           ready = labValid(m) && (!second || actualValid(m.actual, s));
         return `<tr data-measure-row="${t}">${[id, t, ...(second ? [prodFmt(v.tables[c].find((r) => r.target === t).production, s), inputCell("actual", m.actual, id, c, t, second, v.confirmedAt)] : []), ...["L", "a", "b"].map((f) => inputCell(f, m[f], id, c, t, second, second && v.confirmedAt)), `<span data-row-status class="${ready ? "complete" : "incomplete"}">${ready ? "완료" : "미완료"}</span>`].map((x) => `<td>${x}</td>`).join("")}</tr>`;
       }),
-    )}</section>${second ? '<a href="#final">다음: 최종 결과 비교 →</a>' : `<div id="second-preparation">${secondPreparation()}</div><a href="#results1">1차 그래프·원본 확인 (선택)</a>`}`
+    )}</section>${second ? '<a href="#final">다음: 최종 결과 비교 →</a>' : `<div id="second-preparation">${secondPreparation()}</div><a href="#results1">1차 선형도 리포트 열기</a>`}`
   );
 }
 function graphPanels(includeCorrection = false) {
@@ -414,29 +430,18 @@ function graphPanels(includeCorrection = false) {
 }
 function resultsPage() {
   const p = project(),
-    c = channel(),
-    ts = targets(p.settings),
-    n = ts.filter((t) => labValid(p.first[key(c, t)])).length;
+    report = firstPassReport(p, reusableVersion(p));
   return (
     heading(
-      "1차 측정 결과",
-      "측정 곡선과 원본 데이터를 확인하세요. 보정 계산에는 모든 패치가 필요합니다.",
+      "1차 선형도 진단 리포트",
+      "원본의 비선형도와 예상 보정 입력값을 확인한 뒤 2차 제작·측정으로 진행합니다.",
       5,
     ) +
     tabs() +
-    `<section class="card"><h2>${badge(c)} 채널 측정 · ${n} / ${ts.length} 완료</h2>${graphPanels()}${table(
-      ["입력 (%)", "L*", "a*", "b*", "상태"],
-      ts.map((t) => {
-        const m = p.first[key(c, t)];
-        return row([
-          t,
-          ...["L", "a", "b"].map((f) => fmt(m?.[f])),
-          labValid(m) ? "완료" : "미완료",
-        ]);
-      }),
-    )}</section><div id="second-preparation">${secondPreparation()}</div>`
+    renderLinearityReport(p, report, channel(), secondPreparation(report))
   );
 }
+
 function correctionPage() {
   const p = project(),
     v = version();
@@ -845,19 +850,91 @@ function bindPage() {
     button.disabled = true;
     try {
       const p = project(),
-        { version: v, created } = prepareSecondPass(p);
+        destination = button.dataset.destination;
+      const report = firstPassReport(p, reusableVersion(p));
+      if (!report.canProceed) {
+        if (destination === "results1") {
+          location.hash = "results1";
+          toast("리포트에서 미입력 또는 계산할 수 없는 측정값을 확인하세요.");
+          return;
+        }
+        throw Error("1차 측정 리포트에서 계산할 수 없는 값을 확인하세요.");
+      }
+      const { version: v, created } = prepareSecondPass(p);
       await persist(p);
-      if (route === "guide2") render();
-      else location.hash = "guide2";
+      if (route === destination) render();
+      else location.hash = destination;
       toast(
-        created
-          ? `보정 V${v.number} 준비 완료. 가이드로 패치를 제작한 뒤 2차 Lab를 입력하세요.`
-          : `V${v.number}의 기존 2차 작업을 이어갑니다.`,
+        destination === "results1"
+          ? `V${v.number}의 원본 선형도와 예상 제작값을 확인하세요. 리포트는 원본 진단이며, 개선 여부는 2차 결과에서 확인합니다.`
+          : created
+            ? `V${v.number} 준비 완료. 패치를 제작한 뒤 2차 Lab를 입력하세요.`
+            : `V${v.number}의 2차 작업을 이어갑니다.`,
       );
     } catch (error) {
       button.disabled = false;
       throw error;
     }
+  });
+  document.querySelectorAll("[data-review-target]").forEach(
+    (button) =>
+      (button.onclick = () => {
+        const p = project(),
+          c = button.dataset.reviewChannel,
+          t = Number(button.dataset.reviewTarget);
+        p.location.channel = c;
+        p.location.cell = patchId(c, t) + "-L";
+        saveSoon(p);
+        location.hash = "measure1";
+      }),
+  );
+  bind("#report-lab-details", () => requestAnimationFrame(charts), "toggle");
+  bind("#print-report", () => window.print());
+  bind("#export-report", () => {
+    const p = project(),
+      report = firstPassReport(p, reusableVersion(p));
+    exportFile(
+      [
+        [
+          "채널",
+          "패치 ID",
+          "입력 / 목표 (%)",
+          "L*",
+          "a*",
+          "b*",
+          "원본 정규화 계조 (%)",
+          "편차 (%p)",
+          "내부 보정값",
+          "제작 입력값",
+          "검토 항목",
+          "보정 버전",
+          "검증 단계",
+        ],
+        ...report.channels.flatMap((c) =>
+          c.points.map((point) => [
+            c.channel,
+            patchId(c.channel, point.target),
+            point.target,
+            ...["L", "a", "b"].map((f) =>
+              numeric(point.lab?.[f])
+                ? Number(point.lab[f])
+                : (point.lab?.[f] ?? ""),
+            ),
+            point.tone,
+            point.error,
+            point.internal,
+            point.production,
+            c.anomalies
+              .filter((a) => a.to === point.target)
+              .map((a) => a.type)
+              .join(" / "),
+            report.versionNumber ?? "미저장",
+            "1차 원본 진단 · 보정 후 개선 판정 미포함",
+          ]),
+        ),
+      ],
+      "1차-선형도-진단-리포트",
+    );
   });
   bind("#calculate", async () => {
     const p = project(),
@@ -1113,6 +1190,57 @@ function charts() {
     v = version();
   if (route !== "results1" && !final) return;
   if (final && !v) return;
+  if (route === "results1") {
+    const report = firstPassReport(p, reusableVersion(p)),
+      data = report.channels.find((r) => r.channel === channel());
+    if (data?.ready) {
+      drawChart(
+        $("#chart-linearity"),
+        [
+          {
+            color: "#a4adbc",
+            dashed: true,
+            points: [
+              { x: 0, y: 0 },
+              { x: 100, y: 100 },
+            ],
+          },
+          {
+            color: "#4964d9",
+            points: data.points.map((point) => ({
+              x: point.target,
+              y: point.tone,
+            })),
+          },
+        ],
+        "원본 계조 (%)",
+        [0, Math.max(100, ...data.points.map((point) => point.tone))],
+        "입력 (%)",
+      );
+      drawChart(
+        $("#chart-preview"),
+        [
+          {
+            color: "#4964d9",
+            points: data.points.map((point) => ({
+              x: point.target,
+              y: point.internal,
+            })),
+          },
+          {
+            color: "#df7d3a",
+            points: data.points.map((point) => ({
+              x: point.target,
+              y: point.production,
+            })),
+          },
+        ],
+        "예상 보정 입력 (%)",
+        [0, 100],
+        "목표 계조 (%)",
+      );
+    }
+  }
   const c = channel(final),
     ts = final ? v.tables[c].map((r) => r.target) : targets(p.settings);
   ["L", "a", "b"].forEach((f) => {

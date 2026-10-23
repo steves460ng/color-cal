@@ -69,10 +69,12 @@ try {
     (await page.locator("#completion").innerText()).includes("11 / 11"),
   );
   await go("results1");
-  assert.equal(await page.locator("canvas").count(), 3);
+  assert.equal(await page.locator("canvas").count(), 5);
   await go("measure1");
   assert.equal(await page.locator("[data-prepare-second]").isEnabled(), true);
   await page.locator("[data-prepare-second]").click();
+  await page.locator('nav a.active[href="#results1"]').waitFor();
+  await page.locator('[data-destination="guide2"]').click();
   await page.locator('nav a.active[href="#guide2"]').waitFor();
   await page.waitForSelector("#version-select");
   assert.equal(await page.locator("tbody tr").count(), 11);
@@ -127,6 +129,8 @@ try {
   );
   await go("measure1");
   await page.locator("[data-prepare-second]").click();
+  await page.locator('nav a.active[href="#results1"]').waitFor();
+  await page.locator('[data-destination="guide2"]').click();
   await page.locator('nav a.active[href="#guide2"]').waitFor();
   assert.equal(await page.locator("#version-select option").count(), 1);
   await go("measure2");

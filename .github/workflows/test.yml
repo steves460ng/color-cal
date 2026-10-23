@@ -53,6 +53,7 @@ jobs:
           npm run test:resilience
           npm run test:persistence
           npm run test:behavior
+          npm run test:linearity
         working-directory: color-cal
         env:
           BASE_URL: http://127.0.0.1:8000/color-cal/

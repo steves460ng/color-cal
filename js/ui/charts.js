@@ -1,4 +1,10 @@
-export function drawChart(canvas, series, ylabel, yDomain) {
+export function drawChart(
+  canvas,
+  series,
+  ylabel,
+  yDomain,
+  xlabel = "목표 / 입력 (%)",
+) {
   const width = Math.max(canvas.clientWidth, 250),
     height = 230,
     dpr = window.devicePixelRatio || 1;
@@ -42,7 +48,7 @@ export function drawChart(canvas, series, ylabel, yDomain) {
   ctx.textAlign = "left";
   ctx.fillText(ylabel, pad.left, 11);
   ctx.textAlign = "right";
-  ctx.fillText("목표 / 입력 (%)", width - pad.right, height - 1);
+  ctx.fillText(xlabel, width - pad.right, height - 1);
   series.forEach((s) => {
     ctx.strokeStyle = s.color;
     ctx.lineWidth = 2;

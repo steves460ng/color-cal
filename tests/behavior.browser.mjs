@@ -53,13 +53,11 @@ async function go(route, p = page) {
 }
 async function load(p) {
   const count = await page.locator("#project-select option").count();
-  await page
-    .locator("#restore-file")
-    .setInputFiles({
-      name: "test.json",
-      mimeType: "application/json",
-      buffer: Buffer.from(backupText(p)),
-    });
+  await page.locator("#restore-file").setInputFiles({
+    name: "test.json",
+    mimeType: "application/json",
+    buffer: Buffer.from(backupText(p)),
+  });
   await page.waitForFunction(
     (name) =>
       document
@@ -89,6 +87,8 @@ try {
   assert.equal(await page.locator("#calc-C").isEnabled(), false);
   await go("measure1");
   await page.locator("[data-prepare-second]").click();
+  await page.locator('nav a.active[href="#results1"]').waitFor();
+  await page.locator('[data-destination="guide2"]').click();
   await page.locator('nav a.active[href="#guide2"]').waitFor();
   assert.equal(await page.locator("#version-select option").count(), 2);
   const exact = createProject("정확한 제작 수치");

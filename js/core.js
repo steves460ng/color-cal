@@ -226,12 +226,8 @@ export function comparison(v, c) {
   });
 }
 
-/** Prepare the selected channels once; revisiting preserves existing second-pass work. */
-export function prepareSecondPass(p) {
-  const missing = p.settings.channels.filter((c) => !firstComplete(p, c));
-  if (missing.length)
-    throw Error(`${missing.join(" · ")} 채널의 1차 측정을 완료하세요.`);
-  const existing = [...p.versions]
+export function reusableVersion(p) {
+  return [...p.versions]
     .reverse()
     .find(
       (v) =>
@@ -241,6 +237,14 @@ export function prepareSecondPass(p) {
         calibrationTablesValid(v) &&
         (!v.confirmedAt || !confirmationReason(p, v)),
     );
+}
+
+/** Prepare the selected channels once; revisiting preserves existing second-pass work. */
+export function prepareSecondPass(p) {
+  const missing = p.settings.channels.filter((c) => !firstComplete(p, c));
+  if (missing.length)
+    throw Error(`${missing.join(" · ")} 채널의 1차 측정을 완료하세요.`);
+  const existing = reusableVersion(p);
   const version = existing || calculateVersion(p);
   p.location.versionId = version.id;
   if (!version.channels.includes(p.location.channel))
