@@ -1,3 +1,4 @@
+import { sourceSignatureValid } from "../domain/project.js";
 import {
   CHANNELS,
   META,
@@ -5,11 +6,11 @@ import {
   validateSettings,
   targets,
   key,
-  production,
-  sourceSignature,
+  productionForVersion,
   labValid,
-  actualValid,
   secondComplete,
+  calibrationTablesValid,
+  captureConditions,
 } from "../core.js";
 const object = (v) => !!v && typeof v === "object" && !Array.isArray(v);
 function assert(ok, message) {
@@ -58,6 +59,11 @@ export function validateProject(p) {
       p.meta.name.trim(),
     "프로젝트 정보",
   );
+  if (p.conditionsRevision !== undefined)
+    assert(
+      Number.isSafeInteger(p.conditionsRevision) && p.conditionsRevision >= 0,
+      "출력 조건 변경 이력",
+    );
   validateSettings(p.settings);
   validateMeasurements(p.first);
   assert(
@@ -112,7 +118,7 @@ export function validateProject(p) {
             Number.isFinite(r.internal) &&
             r.internal >= 0 &&
             r.internal <= 100 &&
-            r.production === production(r.internal, v.settings) &&
+            r.production === productionForVersion(v, r.internal) &&
             (!i || r.internal >= v.tables[c][i - 1].internal),
           "보정값",
         );
@@ -129,11 +135,24 @@ export function validateProject(p) {
       ),
       "2차 패치 키",
     );
+    assert(sourceSignatureValid(v), "원본 서명");
     assert(
-      v.signature ===
-        sourceSignature({ settings: v.settings, first: v.source }, v.channels),
-      "원본 서명",
+      calibrationTablesValid(v),
+      "보정 테이블이 원본 측정값과 일치하지 않음",
     );
+    if (v.conditions !== undefined)
+      assert(
+        object(v.conditions) &&
+          Object.keys(captureConditions({})).every(
+            (k) => typeof v.conditions[k] === "string",
+          ),
+        "보정 출력 조건",
+      );
+    if (v.conditionsRevision !== undefined)
+      assert(
+        Number.isSafeInteger(v.conditionsRevision) && v.conditionsRevision >= 0,
+        "보정 조건 변경 이력",
+      );
     assert(
       Array.isArray(v.warnings) &&
         v.warnings.every((w) => typeof w === "string"),
@@ -205,6 +224,7 @@ export function parseBackup(text) {
   );
   const p = validateProject(data.project);
   p.id = crypto.randomUUID();
+  delete p.storageRevision;
   p.meta.name += " (복원)";
   p.history.push({
     at: new Date().toISOString(),

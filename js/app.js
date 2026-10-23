@@ -9,13 +9,13 @@ import {
   labValid,
   actualValid,
   numeric,
-  production,
   firstComplete,
   calculateVersion,
   prepareSecondPass,
+  updateProjectMetadata,
   versionCurrent,
-  secondComplete,
   confirmVersion,
+  confirmationReason,
   calculatorReason,
   convert,
   comparison,
@@ -29,6 +29,8 @@ import {
 } from "./storage/indexeddb.js";
 import { backupText, parseBackup, csv, download } from "./storage/backup.js";
 import { drawChart } from "./ui/charts.js";
+import { formatInput } from "./ui/formatters.js";
+import { createSaveQueue } from "./storage/save-queue.js";
 
 const routes = [
   ["projects", "프로젝트"],
@@ -54,13 +56,11 @@ const esc = (value) =>
   );
 const fmt = (value, precision = 2) =>
   numeric(value) ? Number(value).toFixed(precision) : "—";
-const prodFmt = (value, s) =>
-  numeric(value) ? Number(value).toFixed(s.integer ? 0 : s.precision) : "—";
+const prodFmt = formatInput;
 const date = (value) => new Date(value).toLocaleString("ko-KR");
 let projects = [],
   currentId,
   route = "projects",
-  queue = Promise.resolve(),
   pending = 0,
   saveError = false,
   timer,
@@ -89,27 +89,26 @@ function status(text, error = false) {
   $("#save-status").textContent = text;
   $("#save-status").style.color = error ? "#ffb6c1" : "#b8e5d0";
 }
+const saver = createSaveQueue(putProject, {
+  onState(state) {
+    pending = state.pending;
+    saveError = state.failedProjects.length > 0;
+    if (saveError) status("저장 실패 · JSON 백업 필요", true);
+    else status(pending ? "저장 중…" : "자동 저장 완료");
+  },
+  onError(error) {
+    toast(`저장 실패: ${error.message}. JSON 백업으로 보관하세요.`);
+  },
+});
 function persist(p = project()) {
   if (!p) return Promise.resolve();
   p.updatedAt = new Date().toISOString();
-  const snapshot = structuredClone(p);
-  pending++;
-  status("저장 중…");
-  const task = queue.then(() => putProject(snapshot));
-  queue = task.then(
-    () => {
-      pending--;
-      if (!pending && !saveError) status("자동 저장 완료");
-    },
-    (error) => {
-      pending--;
-      saveError = true;
-      status("저장 실패 · JSON 백업 필요", true);
-      toast(`저장 실패: ${error.message}. JSON 백업으로 보관하세요.`);
-    },
-  );
-  return task;
+  return saver.save(p).then((revision) => {
+    p.storageRevision = revision;
+    return revision;
+  });
 }
+
 function saveSoon(p) {
   persist(p).catch(() => {});
 }
@@ -149,7 +148,7 @@ function versionToolbar() {
 }
 function versionNotice(v) {
   const p = project();
-  return `${!versionCurrent(p, v) ? notice("현재 설정 또는 1차 데이터가 이 버전과 다릅니다. 아래는 보존된 과거 버전입니다. 실제 적용하려면 1차 입력 화면의 2차 측정 준비로 새 버전을 만드세요.", "warning") : ""}${v.confirmedAt ? notice(`V${v.number} 확정 · ${date(v.confirmedAt)}. 확정 버전의 제작값·측정값은 잠겨 있습니다. 수정은 새 버전에서 진행하세요.`) : ""}`;
+  return `${!versionCurrent(p, v) ? notice("현재 출력 조건·설정 또는 1차 데이터가 이 버전과 다릅니다. 아래는 보존된 과거 버전입니다. 실제 적용하려면 1차 입력 화면의 2차 측정 준비로 새 버전을 만드세요.", "warning") : ""}${v.confirmedAt ? notice(`V${v.number} 확정 · ${date(v.confirmedAt)}. 확정 버전의 제작값·측정값은 잠겨 있습니다. 수정은 새 버전에서 진행하세요.`) : ""}`;
 }
 function sidebar() {
   const p = project();
@@ -319,11 +318,11 @@ function guidePage(second) {
               patchId(c, r.target, second ? 2 : 1, v?.number),
               `<span class="guide-row-channel">${badge(c)} ${names[c]}</span>`,
               ...(second ? [`${r.target}%`, fmt(r.internal, 8)] : []),
-              `<strong class="guide-production">${prodFmt(r.production, s)}</strong>`,
+              `<strong class="guide-production">${prodFmt(r.production, s, !second)}</strong>`,
               ...(second
                 ? [
                     actualValid(actual, s)
-                      ? prodFmt(actual, s)
+                      ? prodFmt(actual, s, true)
                       : "미기록 또는 유효하지 않음 · 2차 입력에서 기록",
                   ]
                 : []),
@@ -485,7 +484,8 @@ function finalPage() {
     rows = comparison(v, c),
     done = rows.filter((r) => r.after !== null),
     mean = (key) =>
-      done.length ? done.reduce((s, r) => s + r[key], 0) / done.length : null;
+      done.length ? done.reduce((s, r) => s + r[key], 0) / done.length : null,
+    blocked = confirmationReason(p, v);
   return (
     heading(
       "최종 결과",
@@ -495,7 +495,7 @@ function finalPage() {
     versionToolbar() +
     versionNotice(v) +
     tabs(true) +
-    `<div class="metrics"><div class="metric"><span>비교 가능 패치</span><strong>${done.length} / ${rows.length}</strong><span>${c} 채널</span></div><div class="metric"><span>1차 평균 계조 오차</span><strong>${fmt(mean("before"))}</strong><span>%p · 비교 가능 패치 기준</span></div><div class="metric"><span>2차 평균 계조 오차</span><strong>${fmt(mean("after"))}</strong><span>%p · 비교 가능 패치 기준</span></div><div class="metric"><span>개선 패치</span><strong>${rows.filter((r) => r.status === "개선").length}</strong><span>악화 ${rows.filter((r) => r.status === "악화").length} / 동등 ${rows.filter((r) => r.status === "동등").length}</span></div></div><section class="card"><h2>${badge(c)} V${v.number} 측정 결과 비교</h2>${graphPanels(true)}<p class="muted">계조 오차: 종이색 대비 ΔE76 정규화 계조와 목표의 차이(%p). 개선/악화는 절대 오차를 비교한 상대 상태이며 합격 판정이 아닙니다. ΔE76은 종이색–최대 농도의 Lab 직선 목표와 2차 Lab의 차이입니다.</p><div class="toolbar"><button id="export-final">전체 비교표 CSV</button><button class="primary" id="confirm-version" ${v.confirmedAt || !versionCurrent(p, v) || !secondComplete(v) ? "disabled" : ""}>이 보정 버전 확정</button></div>${!secondComplete(v) ? notice("모든 적용 채널의 2차 Lab와 실제 제작 입력값을 기록해야 확정할 수 있습니다.", "warning") : ""}${table(
+    `<div class="metrics"><div class="metric"><span>비교 가능 패치</span><strong>${done.length} / ${rows.length}</strong><span>${c} 채널</span></div><div class="metric"><span>1차 평균 계조 오차</span><strong>${fmt(mean("before"))}</strong><span>%p · 비교 가능 패치 기준</span></div><div class="metric"><span>2차 평균 계조 오차</span><strong>${fmt(mean("after"))}</strong><span>%p · 비교 가능 패치 기준</span></div><div class="metric"><span>개선 패치</span><strong>${rows.filter((r) => r.status === "개선").length}</strong><span>악화 ${rows.filter((r) => r.status === "악화").length} / 동등 ${rows.filter((r) => r.status === "동등").length}</span></div></div><section class="card"><h2>${badge(c)} V${v.number} 측정 결과 비교</h2>${graphPanels(true)}<p class="muted">계조 오차: 종이색 대비 ΔE76 정규화 계조와 목표의 차이(%p). 개선/악화는 절대 오차를 비교한 상대 상태이며 합격 판정이 아닙니다. ΔE76은 종이색–최대 농도의 Lab 직선 목표와 2차 Lab의 차이입니다.</p><div class="toolbar"><button id="export-final">전체 비교표 CSV</button><button class="primary" id="confirm-version" ${v.confirmedAt || blocked ? "disabled" : ""}>이 보정 버전 확정</button></div>${blocked ? notice(esc(blocked), "warning") : ""}${table(
       [
         "목표 (%)",
         "1차 입력 (%)",
@@ -519,7 +519,7 @@ function finalPage() {
           ...["L", "a", "b"].map((f) => fmt(r.first[f])),
           String(r.internal),
           actualValid(r.second?.actual, v.settings)
-            ? prodFmt(r.second.actual, v.settings)
+            ? prodFmt(r.second.actual, v.settings, true)
             : "미기록 / 오류",
           ...["L", "a", "b"].map((f) => fmt(r.second?.[f])),
           fmt(r.before),
@@ -544,7 +544,7 @@ function calculatorPage() {
     ) +
     versionToolbar() +
     (reason ? notice(esc(reason), "warning") : "") +
-    `<section class="card"><div class="card-head"><div><h2>${esc(p.meta.name)} ${v ? `· V${v.number}` : ""}</h2><p class="muted">${v ? "적용 채널: " + v.channels.join(" / ") : "적용할 버전 없음"} · 미보정 채널은 원본값을 통과시킵니다.</p></div><label class="check"><input type="checkbox" id="calc-integer" ${calcInteger ? "checked" : ""}>정수값 모드</label></div><p class="muted">계산기의 모드는 이번 변환 출력에만 적용됩니다. 저장된 프로젝트 모드와 제작·측정 이력은 변경하지 않습니다.</p><div class="calculator">${CHANNELS.map((c) => `<div class="calc-channel"><label for="calc-${c}">${badge(c)} 원본 입력 (%)</label><input id="calc-${c}" data-calc="${c}" type="number" value="0" min="0" max="100" step="${calcInteger ? "1" : "any"}" ${reason ? "disabled" : ""}><span class="calc-result" id="output-${c}">—</span><span class="calc-internal" id="internal-${c}">내부값 —</span><p class="muted">${v?.tables[c] ? "보정 적용" : "미보정 · 원본 통과"}</p></div>`).join("")}</div><div id="calc-error" role="alert"></div><div class="summary-output" id="calc-summary">${reason ? "보정 적용 대기" : "C 0 / M 0 / Y 0 / K 0"}</div><div class="toolbar"><button id="copy-calculator" ${reason ? "disabled" : ""}>결과 전체 복사</button><button id="copy-calculator-csv" ${reason ? "disabled" : ""}>CSV 형식 복사</button><button id="reset-calculator">입력 초기화</button></div>${notice("혼합색의 Lab값을 예측하거나 색상 일치를 보장하지 않습니다. 개별 단색 채널의 계조 보정값만 제공합니다.")}</section>`
+    `<section class="card"><div class="card-head"><div><h2>${esc(p.meta.name)} ${v ? `· V${v.number}` : ""}</h2><p class="muted">${v ? "적용 채널: " + v.channels.join(" / ") : "적용할 버전 없음"} · 미보정 채널은 원본값을 통과시킵니다.</p></div><label class="check"><input type="checkbox" id="calc-integer" ${calcInteger ? "checked" : ""}>정수값 모드</label></div><p class="muted">계산기의 모드는 이번 변환 출력에만 적용됩니다. 저장된 프로젝트 모드와 제작·측정 이력은 변경하지 않습니다.</p><div class="calculator">${CHANNELS.map((c) => `<div class="calc-channel"><label for="calc-${c}">${badge(c)} 원본 입력 (%)</label><input id="calc-${c}" data-calc="${c}" type="number" value="0" min="0" max="100" step="${calcInteger ? "1" : "any"}" ${reason ? "disabled" : ""}><span class="calc-result" id="output-${c}">—</span><span class="calc-internal" id="internal-${c}">내부값 —</span><p class="muted">${reason ? "보정 대기" : v?.tables[c] ? "보정 적용" : "미보정 · 원본 통과"}</p></div>`).join("")}</div><div id="calc-error" role="alert"></div><div class="summary-output" id="calc-summary">${reason ? "보정 적용 대기" : "C 0 / M 0 / Y 0 / K 0"}</div><div class="toolbar"><button id="copy-calculator" ${reason ? "disabled" : ""}>결과 전체 복사</button><button id="copy-calculator-csv" ${reason ? "disabled" : ""}>CSV 형식 복사</button><button id="reset-calculator">입력 초기화</button></div>${notice("혼합색의 Lab값을 예측하거나 색상 일치를 보장하지 않습니다. 개별 단색 채널의 계조 보정값만 제공합니다.")}</section>`
   );
 }
 async function copy(text) {
@@ -694,7 +694,7 @@ function bindPage() {
         Object.keys(META).map((k) => [k, String(data.get(k) || "").trim()]),
       );
       if (!meta.name) throw Error("프로젝트 이름을 입력하세요.");
-      p.meta = meta;
+      updateProjectMetadata(p, meta);
       record(p, "프로젝트 정보 수정");
       await persist(p);
       render();
@@ -711,7 +711,10 @@ function bindPage() {
           input.name === "name" && !value ? "프로젝트 이름을 입력하세요." : "",
         );
         if (!input.validity.valid) return;
-        project().meta[input.name] = value;
+        updateProjectMetadata(project(), {
+          ...project().meta,
+          [input.name]: value,
+        });
         saveSoon();
         sidebar();
       });
@@ -725,6 +728,7 @@ function bindPage() {
   bind("#duplicate-project", async () => {
     const p = structuredClone(project());
     p.id = crypto.randomUUID();
+    delete p.storageRevision;
     p.meta.name += " (복제)";
     record(p, "프로젝트 복제");
     await persist(p);
@@ -740,8 +744,9 @@ function bindPage() {
       )
     )
       return;
-    await queue;
-    await deleteProject(p.id);
+    await saver.idle();
+    await deleteProject(p.id, p.storageRevision || 0);
+    saver.forget(p.id);
     projects = projects.filter((x) => x.id !== p.id);
     currentId = projects[0]?.id;
     render();
@@ -794,7 +799,9 @@ function bindPage() {
         ...rs.map((r) => [
           patchId(c, r.target, second ? 2 : 1, v?.number),
           r.target,
-          ...CHANNELS.map((ch) => prodFmt(ch === c ? r.production : 0, s)),
+          ...CHANNELS.map((ch) =>
+            prodFmt(ch === c ? r.production : 0, s, !second),
+          ),
         ]),
       ]).slice(1),
     );
@@ -1119,9 +1126,7 @@ function charts() {
           color: "#4964d9",
           points: ts.map((t) => ({
             x: t,
-            y: numeric(first[key(c, t)]?.[f])
-              ? Number(first[key(c, t)][f])
-              : NaN,
+            y: labValid(first[key(c, t)]) ? Number(first[key(c, t)][f]) : NaN,
           })),
         },
         ...(final
@@ -1130,9 +1135,11 @@ function charts() {
                 color: "#df7d3a",
                 points: ts.map((t) => ({
                   x: t,
-                  y: numeric(v.second[key(c, t)]?.[f])
-                    ? Number(v.second[key(c, t)][f])
-                    : NaN,
+                  y:
+                    labValid(v.second[key(c, t)]) &&
+                    actualValid(v.second[key(c, t)]?.actual, v.settings)
+                      ? Number(v.second[key(c, t)][f])
+                      : NaN,
                 })),
               },
             ]
@@ -1162,7 +1169,7 @@ function charts() {
           color: "#df7d3a",
           points: v.tables[c].map((r) => ({
             x: r.target,
-            y: numeric(v.second[key(c, r.target)]?.actual)
+            y: actualValid(v.second[key(c, r.target)]?.actual, v.settings)
               ? Number(v.second[key(c, r.target)].actual)
               : NaN,
           })),

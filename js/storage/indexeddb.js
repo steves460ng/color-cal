@@ -32,6 +32,43 @@ async function transaction(mode, operation) {
   });
 }
 export const listProjects = () => transaction("readonly", (s) => s.getAll());
-export const putProject = (p) => transaction("readwrite", (s) => s.put(p));
-export const deleteProject = (id) =>
-  transaction("readwrite", (s) => s.delete(id));
+async function mutateProject(id, expectedRevision, change) {
+  const database = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = database.transaction("projects", "readwrite"),
+      store = tx.objectStore("projects");
+    let failure, result;
+    const request = store.get(id);
+    request.onsuccess = () => {
+      try {
+        if (
+          expectedRevision !== undefined &&
+          (request.result?.storageRevision || 0) !== expectedRevision
+        ) {
+          throw Error(
+            "다른 탭에서 이 프로젝트를 변경했습니다. 현재 입력을 JSON 백업한 뒤 새로고침하세요.",
+          );
+        }
+        result = change(store);
+      } catch (error) {
+        failure = error;
+        tx.abort();
+      }
+    };
+    tx.oncomplete = () => resolve(result);
+    tx.onerror = tx.onabort = () =>
+      reject(failure || tx.error || Error("저장 트랜잭션 실패"));
+  });
+}
+export function putProject(p, expectedRevision = p.storageRevision || 0) {
+  return mutateProject(p.id, expectedRevision, (store) => {
+    const revision = expectedRevision + 1;
+    store.put({ ...p, storageRevision: revision });
+    return revision;
+  });
+}
+export function deleteProject(id, expectedRevision) {
+  return mutateProject(id, expectedRevision, (store) => {
+    store.delete(id);
+  });
+}

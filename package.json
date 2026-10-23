@@ -4,11 +4,12 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node --test tests/*.test.js",
+    "test": "node --test --test-isolation=none tests/*.test.js",
     "start": "python3 -m http.server 8000 --bind 0.0.0.0",
     "test:browser": "node tests/browser.mjs",
     "test:resilience": "node tests/resilience.mjs",
-    "test:persistence": "node tests/persistence.mjs"
+    "test:persistence": "node tests/persistence.mjs",
+    "test:behavior": "node tests/behavior.browser.mjs"
   },
   "devDependencies": {
     "playwright": "1.64.1"
