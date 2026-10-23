@@ -858,3 +858,227 @@ h3 {
     display: none !important;
   }
 }
+
+.reference-print {
+  display: none;
+}
+.reference-heading {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin: 16px 0 8px;
+}
+.reference-heading h2 {
+  font-size: 23px;
+  margin: 0 0 9px;
+}
+.reference-heading p,
+.reference-conditions {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+.reference-status {
+  font-size: 12px;
+  color: #23754f;
+  background: #e8f6ef;
+  border: 1px solid #c0e2ce;
+  border-radius: 5px;
+  padding: 7px 11px;
+}
+.reference-status.reference-warning {
+  color: #865a0a;
+  background: #fff3d7;
+  border-color: #e6cb8e;
+}
+.reference-caution {
+  font-weight: 650;
+  color: #8d5405;
+  font-size: 12px;
+  line-height: 1.7;
+}
+.reference-table {
+  table-layout: fixed;
+}
+.reference-table thead th {
+  text-align: center;
+  font-size: 14px;
+  padding: 13px 8px;
+}
+.reference-table thead small {
+  display: block;
+  font-size: 10px;
+  font-weight: 500;
+  margin-top: 5px;
+  color: #66738b;
+}
+.reference-letter {
+  font-size: 21px;
+  font-weight: 800;
+}
+.reference-table tbody th {
+  position: static;
+  text-align: center;
+  background: #f7f9fc;
+  font-size: 14px;
+  font-weight: 650;
+}
+.reference-table td {
+  font-size: 19px;
+  font-weight: 750;
+  text-align: center;
+  padding: 10px 8px;
+  line-height: 1.3;
+}
+.reference-table .reference-major td,
+.reference-table .reference-major th {
+  border-top: 2px solid #c9d3e4;
+}
+.reference-table .reference-passthrough {
+  font-weight: 400;
+  color: #7d8799;
+}
+.reference-table .reference-c {
+  color: #007c95;
+  border-bottom: 3px solid #00a3c6;
+}
+.reference-table .reference-m {
+  color: #a33168;
+  border-bottom: 3px solid #d2498d;
+}
+.reference-table .reference-y {
+  color: #836300;
+  border-bottom: 3px solid #e6b627;
+}
+.reference-table .reference-k {
+  color: #28364e;
+  border-bottom: 3px solid #374155;
+}
+.correction-advanced > summary {
+  font-weight: 650;
+  color: #65738a;
+}
+#reference-custom {
+  width: 100px;
+}
+@media (max-width: 600px) {
+  .reference-table td {
+    font-size: 16px;
+    padding: 10px 5px;
+  }
+  .reference-table thead th {
+    font-size: 12px;
+    padding: 12px 5px;
+  }
+  .reference-table thead small {
+    white-space: normal;
+  }
+  .reference-table tbody th {
+    font-size: 12px;
+  }
+  .reference-letter {
+    font-size: 18px;
+  }
+}
+@media print {
+  body.printing-reference #content > :not(.lookup-sheet) {
+    display: none !important;
+  }
+  body.printing-reference .lookup-sheet {
+    margin: 0 !important;
+  }
+  .lookup-sheet .reference-screen,
+  .lookup-sheet > .muted,
+  .lookup-sheet #reference-error {
+    display: none !important;
+  }
+  .reference-print {
+    display: block !important;
+  }
+  .reference-print-page {
+    break-after: page;
+  }
+  .reference-print-page:last-child {
+    break-after: auto;
+  }
+  .reference-print-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 5mm;
+    align-items: start;
+  }
+  .reference-print .reference-heading {
+    margin: 0 0 2mm;
+    gap: 2mm;
+    flex-wrap: nowrap;
+  }
+  .reference-print .reference-heading h2 {
+    font-size: 14pt !important;
+    margin: 0 0 1mm;
+  }
+  .reference-print .reference-heading p,
+  .reference-print .reference-conditions,
+  .reference-print .reference-caution {
+    font-size: 7pt;
+    line-height: 1.25;
+    margin: 0 0 2mm;
+  }
+  .reference-print .reference-status {
+    font-size: 8pt;
+    padding: 1mm 2mm;
+    white-space: nowrap;
+    color: black;
+    background: white;
+  }
+  .reference-print .reference-table {
+    border: 1px solid #777;
+    white-space: normal;
+  }
+  .reference-print .reference-table td,
+  .reference-print .reference-table th {
+    font-size: 8pt !important;
+    line-height: 1.15;
+    padding: 1.6px 3px !important;
+    color: black !important;
+    background: white !important;
+  }
+  .reference-print .reference-letter {
+    font-size: 10pt;
+  }
+  .reference-print .reference-table thead th {
+    border-bottom: 1px solid black;
+  }
+  .reference-print .reference-table .reference-major td,
+  .reference-print .reference-table .reference-major th {
+    border-top: 1px solid #555;
+  }
+  .reference-print .reference-table .reference-passthrough {
+    font-weight: 400;
+    font-style: italic;
+  }
+  .reference-print footer {
+    display: flex;
+    justify-content: space-between;
+    gap: 5mm;
+    font-size: 7pt;
+    line-height: 1.3;
+    margin-top: 2mm;
+  }
+  .reference-print footer span {
+    white-space: nowrap;
+  }
+}
+
+@media print {
+  #content:has(> .lookup-sheet) > :not(.lookup-sheet) {
+    display: none !important;
+  }
+  .reference-print .reference-table thead small {
+    font-size: 6pt !important;
+    margin-top: 0;
+    line-height: 1;
+  }
+}

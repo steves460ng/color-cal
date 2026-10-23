@@ -14,6 +14,7 @@ import {
   interpolate,
   calibrationTablesValid,
   productionForVersion,
+  convertChannels,
 } from "./domain/calibration.js";
 import { captureConditions, sourceFingerprint } from "./domain/project.js";
 export * from "./domain/values.js";
@@ -24,6 +25,7 @@ export {
   deriveCalibration,
   calibrationTablesValid,
   productionForVersion,
+  convertChannels,
 } from "./domain/calibration.js";
 export { captureConditions, updateProjectMetadata } from "./domain/project.js";
 
@@ -166,21 +168,7 @@ export function convert(p, v, input, integer = p.settings.integer) {
   const reason = calculatorReason(p, v);
   if (reason) throw Error(reason);
   const settings = { ...p.settings, integer };
-  return CHANNELS.map((c) => {
-    const value = input[c];
-    if (!actualValid(value, settings))
-      throw Error(`${c}: ${integer ? "정수 " : ""}0~100%를 입력하세요.`);
-    const internal = v.tables[c]
-      ? interpolate(v.tables[c], Number(value))
-      : Number(value);
-    return {
-      channel: c,
-      input: Number(value),
-      internal,
-      output: productionForVersion(v, internal, settings),
-      applied: !!v.tables[c],
-    };
-  });
+  return convertChannels(v, input, settings);
 }
 export function comparison(v, c) {
   const ts = v.tables[c];

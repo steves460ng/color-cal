@@ -1,5 +1,7 @@
 import {
   numeric,
+  CHANNELS,
+  actualValid,
   clamp,
   production,
   targets,
@@ -148,4 +150,25 @@ export function productionForVersion(
       ? Math.round(value)
       : Number(value.toFixed(settings.precision)),
   );
+}
+
+/** Shared arithmetic for the interactive calculator and printable lookup sheet. */
+export function convertChannels(version, input, settings = version.settings) {
+  return CHANNELS.map((channel) => {
+    const value = input[channel];
+    if (!actualValid(value, settings))
+      throw Error(
+        `${channel}: ${settings.integer ? "정수 " : ""}0–100%를 입력하세요.`,
+      );
+    const internal = version.tables[channel]
+      ? interpolate(version.tables[channel], Number(value))
+      : Number(value);
+    return {
+      channel,
+      input: Number(value),
+      internal,
+      output: productionForVersion(version, internal, settings),
+      applied: !!version.tables[channel],
+    };
+  });
 }

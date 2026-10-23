@@ -30,6 +30,8 @@ import {
 } from "./storage/indexeddb.js";
 import { backupText, parseBackup, csv, download } from "./storage/backup.js";
 import { drawChart } from "./ui/charts.js";
+import { referenceTable } from "./domain/reference-table.js";
+import { renderReferenceTable } from "./ui/reference-table.js";
 import { firstPassReport } from "./domain/linearity.js";
 import { renderLinearityReport } from "./ui/linearity-report.js";
 import { formatInput } from "./ui/formatters.js";
@@ -41,7 +43,7 @@ const routes = [
   ["guide1", "1차 패치 가이드"],
   ["measure1", "1차 측정 입력"],
   ["results1", "1차 선형도 리포트"],
-  ["correction", "보정 테이블·버전 (상세)"],
+  ["correction", "CMYK 보정 조견표"],
   ["guide2", "2차 패치 가이드"],
   ["measure2", "2차 측정 입력"],
   ["final", "최종 결과"],
@@ -151,7 +153,7 @@ function versionToolbar() {
 }
 function versionNotice(v) {
   const p = project();
-  return `${!versionCurrent(p, v) ? notice("현재 출력 조건·설정 또는 1차 데이터가 이 버전과 다릅니다. 아래는 보존된 과거 버전입니다. 실제 적용하려면 1차 입력 화면의 2차 측정 준비로 새 버전을 만드세요.", "warning") : ""}${v.confirmedAt ? notice(`V${v.number} 확정 · ${date(v.confirmedAt)}. 확정 버전의 제작값·측정값은 잠겨 있습니다. 수정은 새 버전에서 진행하세요.`) : ""}`;
+  return `${!versionCurrent(p, v) ? notice("현재 출력 조건·설정 또는 1차 데이터가 이 버전과 다릅니다. 아래는 보존된 과거 버전입니다. 실제 적용하려면 1차 입력 화면에서 선형도 리포트를 다시 생성해 새 버전을 준비하세요.", "warning") : ""}${v.confirmedAt ? notice(`V${v.number} 확정 · ${date(v.confirmedAt)}. 확정 버전의 제작값·측정값은 잠겨 있습니다. 수정은 새 버전에서 진행하세요.`) : ""}`;
 }
 function sidebar() {
   const p = project();
@@ -179,7 +181,7 @@ function sidebar() {
           `<a href="#${id}" class="${route === id ? "active" : ""}" ${route === id ? 'aria-current="page"' : ""}><b>${String(i + 1).padStart(2, "0")}</b>${label}</a>`,
       )
       .join("") +
-    `<a href="#correction" class="nav-detail ${route === "correction" ? "active" : ""}" ${route === "correction" ? 'aria-current="page"' : ""}><b>⋯</b>보정 테이블·버전 (상세)</a>`;
+    `<a href="#correction" class="nav-detail ${route === "correction" ? "active" : ""}" ${route === "correction" ? 'aria-current="page"' : ""}><b>⋯</b>CMYK 보정 조견표</a>`;
   $("#backup").disabled = !p;
 }
 function render() {
@@ -216,6 +218,7 @@ function render() {
   });
 }
 function navigate() {
+  document.body.classList.remove("printing-reference");
   route = location.hash.slice(1).split("?")[0] || "projects";
   if (!routes.some(([id]) => id === route)) route = "projects";
   const p = project();
@@ -442,20 +445,50 @@ function resultsPage() {
   );
 }
 
+function selectedReferenceStep(v) {
+  const selected = project().location.referenceStep ?? 5;
+  try {
+    targets({ ...v.settings, step: selected });
+    return selected;
+  } catch {
+    return 5;
+  }
+}
 function correctionPage() {
+  const advancedOpen = document.querySelector('.correction-advanced')?.open ?? false;
   const p = project(),
     v = version();
+  let sheet = empty(
+    "아직 보정 버전이 없습니다.",
+    "measure1",
+    "1차 측정 입력으로 이동",
+  );
+  if (v) {
+    try {
+      const step = selectedReferenceStep(v);
+      sheet = renderReferenceTable(
+        p,
+        v,
+        referenceTable(v, step),
+        step,
+        calculatorReason(p, v),
+      );
+    } catch (error) {
+      sheet = notice(esc(error.message), "warning");
+    }
+  }
   return (
     heading(
-      "보정 테이블·버전 (상세)",
-      "2차 측정 준비에서 보정값은 자동 계산됩니다. 여기서는 테이블 확인·내보내기와 별도 버전 생성을 할 수 있습니다.",
+      "CMYK 보정 조견표",
+      "목표 계조별 C·M·Y·K 제작값을 한눈에 확인하고, 원하는 간격으로 인쇄하세요.",
     ) +
-    `<section class="card"><h2>새 보정 버전 만들기</h2><div class="toolbar"><label>계산 범위 <select id="calculate-channel"><option value="all">선택한 전체 채널</option>${p.settings.channels.map((c) => `<option value="${c}">${c} 채널만</option>`).join("")}</select></label><button class="primary" id="calculate">보정값 계산 · 새 버전 생성</button></div><p class="muted">${p.settings.channels.map((c) => `${c}: ${firstComplete(p, c) ? "입력 완료" : "미입력 있음"}`).join(" / ")}</p><details><summary>보정 알고리즘과 한계</summary><p>종이색(0%)부터 최대 농도(100%)까지의 ΔE*ab (CIE76)를 0~100%로 정규화합니다. 비단조 측정 곡선은 PAVA 단조 회귀로 정리한 뒤, 선형 목표 계조에 역선형 보간합니다. 0%와 100%는 고정하며 평탄 구간의 정확한 목표값은 해당 입력 구간 중점을 사용합니다. 이는 단색 계조용 경험적 보정으로 ISO 농도·SCTV 표준 구현이나 ICC 색상 일치 보장이 아닙니다. 인쇄장비에 실제 적용하기 전에 2차 측정과 작업자 검토가 필요합니다.</p></details></section>${
+    (v ? versionToolbar() + versionNotice(v) : "") +
+    sheet +
+    `<details class="card no-print correction-advanced" ${advancedOpen?'open':''}><summary>보정 버전 생성·내부 계산값 (고급)</summary><div class="toolbar"><label>계산 범위 <select id="calculate-channel"><option value="all">선택한 전체 채널</option>${p.settings.channels.map((c) => `<option value="${c}">${c} 채널만</option>`).join("")}</select></label><button class="primary" id="calculate">보정값 계산 · 새 버전 생성</button></div><p class="muted">일반 작업은 1차 선형도 리포트를 거쳐 진행합니다. 여기서 새 버전을 만들어도 이전 버전과 측정값은 유지됩니다.</p>
+    ${
       v
-        ? versionToolbar() +
-          versionNotice(v) +
-          tabs(true) +
-          `<section class="card"><div class="card-head"><h2>V${v.number} · ${badge(channel(true))} 보정 테이블</h2><span class="badge ${v.confirmedAt ? "success" : ""}">${v.confirmedAt ? "확정" : "검증 중"}</span></div><p class="muted">생성: ${date(v.createdAt)} · 버전 정수 모드 ${v.settings.integer ? "ON" : "OFF"}</p>${v.warnings.map((w) => notice(esc(w), "warning")).join("")}<div class="toolbar"><button id="copy-correction">현재 채널 보정값 복사</button><button id="export-correction">보정 테이블 전체 CSV</button><a href="#guide2">2차 패치 제작 →</a></div>${table(
+        ? tabs(true) +
+          `<div class="toolbar"><button id="copy-correction">현재 채널 보정값 복사</button><button id="export-correction">보정 테이블 전체 CSV</button><a href="#guide2">2차 패치 제작 →</a></div>${table(
             [
               "목표 계조 (%)",
               "내부 계산값 (원정밀도)",
@@ -472,11 +505,12 @@ function correctionPage() {
                 `V${v.number}`,
               ]),
             ),
-          )}</section>`
-        : empty("아직 보정 버전이 없습니다.")
-    }`
+          )}`
+        : ""
+    }</details>`
   );
 }
+
 function finalPage() {
   const p = project(),
     v = version();
@@ -549,7 +583,7 @@ function calculatorPage() {
     ) +
     versionToolbar() +
     (reason ? notice(esc(reason), "warning") : "") +
-    `<section class="card"><div class="card-head"><div><h2>${esc(p.meta.name)} ${v ? `· V${v.number}` : ""}</h2><p class="muted">${v ? "적용 채널: " + v.channels.join(" / ") : "적용할 버전 없음"} · 미보정 채널은 원본값을 통과시킵니다.</p></div><label class="check"><input type="checkbox" id="calc-integer" ${calcInteger ? "checked" : ""}>정수값 모드</label></div><p class="muted">계산기의 모드는 이번 변환 출력에만 적용됩니다. 저장된 프로젝트 모드와 제작·측정 이력은 변경하지 않습니다.</p><div class="calculator">${CHANNELS.map((c) => `<div class="calc-channel"><label for="calc-${c}">${badge(c)} 원본 입력 (%)</label><input id="calc-${c}" data-calc="${c}" type="number" value="0" min="0" max="100" step="${calcInteger ? "1" : "any"}" ${reason ? "disabled" : ""}><span class="calc-result" id="output-${c}">—</span><span class="calc-internal" id="internal-${c}">내부값 —</span><p class="muted">${reason ? "보정 대기" : v?.tables[c] ? "보정 적용" : "미보정 · 원본 통과"}</p></div>`).join("")}</div><div id="calc-error" role="alert"></div><div class="summary-output" id="calc-summary">${reason ? "보정 적용 대기" : "C 0 / M 0 / Y 0 / K 0"}</div><div class="toolbar"><button id="copy-calculator" ${reason ? "disabled" : ""}>결과 전체 복사</button><button id="copy-calculator-csv" ${reason ? "disabled" : ""}>CSV 형식 복사</button><button id="reset-calculator">입력 초기화</button></div>${notice("혼합색의 Lab값을 예측하거나 색상 일치를 보장하지 않습니다. 개별 단색 채널의 계조 보정값만 제공합니다.")}</section>`
+    `<section class="card"><div class="card-head"><div><h2>${esc(p.meta.name)} ${v ? `· V${v.number}` : ""}</h2><p class="muted">${v ? "적용 채널: " + v.channels.join(" / ") : "적용할 버전 없음"} · 미보정 채널은 원본값을 통과시킵니다.</p></div><label class="check"><input type="checkbox" id="calc-integer" ${calcInteger ? "checked" : ""}>정수값 모드</label></div><p class="muted">계산기의 모드는 이번 변환 출력에만 적용됩니다. 저장된 프로젝트 모드와 제작·측정 이력은 변경하지 않습니다.</p><div class="calculator">${CHANNELS.map((c) => `<div class="calc-channel"><label for="calc-${c}">${badge(c)} 원본 입력 (%)</label><input id="calc-${c}" data-calc="${c}" type="number" value="0" min="0" max="100" step="${calcInteger ? "1" : "any"}" ${reason ? "disabled" : ""}><span class="calc-result" id="output-${c}">—</span><span class="calc-internal" id="internal-${c}">내부값 —</span><p class="muted">${reason ? "보정 대기" : v?.tables[c] ? "보정 적용" : "미보정 · 원본 통과"}</p></div>`).join("")}</div><div id="calc-error" role="alert"></div><div class="summary-output" id="calc-summary">${reason ? "보정 적용 대기" : "C 0 / M 0 / Y 0 / K 0"}</div><div class="toolbar"><button id="copy-calculator" ${reason ? "disabled" : ""}>결과 전체 복사</button><button id="copy-calculator-csv" ${reason ? "disabled" : ""}>CSV 형식 복사</button><button id="reset-calculator">입력 초기화</button><a href="#correction">CMYK 보정 조견표·인쇄 →</a></div>${notice("혼합색의 Lab값을 예측하거나 색상 일치를 보장하지 않습니다. 개별 단색 채널의 계조 보정값만 제공합니다.")}</section>`
   );
 }
 async function copy(text) {
@@ -936,6 +970,86 @@ function bindPage() {
       "1차-선형도-진단-리포트",
     );
   });
+  bind(
+    "#reference-step",
+    (e) => {
+      const custom = e.target.value === "custom";
+      $("#reference-custom-label").hidden = !custom;
+      if (custom) {
+        $("#reference-custom").focus();
+        $("#reference-custom").select();
+      } else {
+        $("#reference-custom").value = e.target.value;
+        $("#reference-settings").requestSubmit();
+      }
+    },
+    "change",
+  );
+  bind(
+    "#reference-settings",
+    async (e) => {
+      e.preventDefault();
+      const p = project(),
+        v = version(),
+        step = Number($("#reference-custom").value);
+      try {
+        referenceTable(v, step);
+        p.location.referenceStep = step;
+        await persist(p);
+        render();
+      } catch (error) {
+        $("#reference-error").innerHTML = notice(esc(error.message), "error");
+        throw error;
+      }
+    },
+    "submit",
+  );
+  bind("#print-reference", () => {
+    document.body.classList.add("printing-reference");
+    try {
+      window.print();
+    } catch (error) {
+      document.body.classList.remove("printing-reference");
+      throw error;
+    }
+  });
+  bind("#export-reference", () => {
+    const p = project(),
+      v = version(),
+      rows = referenceTable(v, selectedReferenceStep(v)),
+      reason = calculatorReason(p, v);
+    exportFile(
+      [
+        [
+          "목표 (%)",
+          "C",
+          "M",
+          "Y",
+          "K",
+          "C 적용",
+          "M 적용",
+          "Y 적용",
+          "K 적용",
+          "프로젝트",
+          "버전",
+          "조견표 간격",
+          "정수 모드",
+          "상태",
+        ],
+        ...rows.map((row) => [
+          row.target,
+          ...row.channels.map((c) => c.output),
+          ...row.channels.map((c) => (c.applied ? "보정" : "미보정·원본 통과")),
+          p.meta.name,
+          v.number,
+          selectedReferenceStep(v),
+          v.settings.integer,
+          reason || "확정·사용 가능",
+        ]),
+      ],
+      `CMYK-보정-조견표-V${v.number}`,
+    );
+  });
   bind("#calculate", async () => {
     const p = project(),
       selection = $("#calculate-channel").value,
@@ -1307,6 +1421,9 @@ function charts() {
       [0, 100],
     );
 }
+window.addEventListener("afterprint", () =>
+  document.body.classList.remove("printing-reference"),
+);
 window.addEventListener("resize", charts);
 $("#project-select").addEventListener("change", (e) => {
   currentId = e.target.value;
