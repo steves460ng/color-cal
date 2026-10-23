@@ -47,13 +47,11 @@ async function go(route) {
   await page.locator(`nav a.active[href="#${route}"]`).waitFor();
 }
 async function load(p) {
-  await page
-    .locator("#restore-file")
-    .setInputFiles({
-      name: "reference.json",
-      mimeType: "application/json",
-      buffer: Buffer.from(backupText(p)),
-    });
+  await page.locator("#restore-file").setInputFiles({
+    name: "reference.json",
+    mimeType: "application/json",
+    buffer: Buffer.from(backupText(p)),
+  });
   await page.waitForFunction(
     (n) =>
       document
@@ -69,6 +67,12 @@ try {
   await load(p);
   assert.equal(await page.locator(".reference-screen tbody tr").count(), 21);
   assert.equal(await page.locator(".reference-screen thead th").count(), 5);
+  assert.equal(await page.locator(".reference-heading p").count(), 0);
+  assert.ok(
+    !(await page.locator(".lookup-sheet").textContent()).includes(
+      "생성 당시 출력 조건 사본이 없는 과거 버전입니다.",
+    ),
+  );
   assert.ok(
     (await page.locator(".reference-screen").innerText()).includes(
       "미보정 · 원본 통과",
@@ -135,12 +139,22 @@ try {
   await page.evaluate(() => (window.print = () => {}));
   await page.locator("#print-reference").click();
   await page.emulateMedia({ media: "print" });
+  assert.equal(
+    await page.evaluate(
+      () => getComputedStyle(document.documentElement).backgroundColor,
+    ),
+    "rgb(255, 255, 255)",
+  );
   assert.equal(await page.locator(".reference-screen").isVisible(), false);
   assert.equal(await page.locator(".reference-print").isVisible(), true);
   assert.equal(await page.locator("aside").isVisible(), false);
   assert.equal(await page.locator(".correction-advanced").isVisible(), false);
   assert.equal(await page.locator(".reference-print tbody tr").count(), 101);
-  assert.ok((await page.locator('.reference-print thead').first().innerText()).includes('미보정'));
+  assert.ok(
+    (await page.locator(".reference-print thead").first().innerText()).includes(
+      "미보정",
+    ),
+  );
   await page.pdf({
     path: "test-results/reference-sheet-print.pdf",
     preferCSSPageSize: true,
@@ -148,9 +162,9 @@ try {
   });
   await page.evaluate(() => window.dispatchEvent(new Event("afterprint")));
   await page.emulateMedia({ media: "screen" });
-  await page.emulateMedia({media:'print'});
-  assert.equal(await page.locator('#content > .page-head').isVisible(),false);
-  await page.emulateMedia({media:'screen'});
+  await page.emulateMedia({ media: "print" });
+  assert.equal(await page.locator("#content > .page-head").isVisible(), false);
+  await page.emulateMedia({ media: "screen" });
   const draft = fixture("미확정 참고표");
   draft.versions[0].confirmedAt = null;
   await load(draft);
@@ -158,6 +172,15 @@ try {
     (
       await page.locator(".reference-screen .reference-status").innerText()
     ).includes("현재 적용 불가"),
+  );
+  const legacy = fixture("과거 조건 미기록");
+  delete legacy.versions[0].conditions;
+  await load(legacy);
+  assert.equal(await page.locator(".reference-conditions").count(), 0);
+  assert.ok(
+    !(await page.locator(".lookup-sheet").textContent()).includes(
+      "생성 당시 출력 조건 사본이 없는 과거 버전입니다.",
+    ),
   );
   await load(fixture("소수 조견표", false));
   await page.locator("#reference-step").selectOption("custom");

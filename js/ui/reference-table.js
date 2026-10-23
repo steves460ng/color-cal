@@ -17,8 +17,18 @@ export function renderReferenceTable(project, version, rows, step, reason) {
   const state = reason ? "참고용 · 현재 적용 불가" : "확정 · 사용 가능";
   const settings = version.settings,
     conditions = version.conditions;
+  const recordedConditions = conditions
+    ? [
+        ["장비", conditions.printer],
+        ["용지", conditions.paper],
+        ["잉크", conditions.ink],
+      ]
+        .filter(([, value]) => value?.trim())
+        .map(([label, value]) => `${label}: ${esc(value)}`)
+        .join(" · ")
+    : "";
   const metadata = () =>
-    `<div class="reference-heading"><div><h2>CMYK 보정 조견표</h2><p>${esc(project.meta.name)} · V${version.number} · ${step}% 간격 · ${settings.integer ? "정수" : "소수 " + settings.precision + "자리"} 모드</p></div><strong class="reference-status ${reason ? "reference-warning" : ""}">${state}</strong></div><p class="reference-conditions">${conditions ? `장비: ${esc(conditions.printer || "미기록")} · 용지: ${esc(conditions.paper || "미기록")} · 잉크: ${esc(conditions.ink || "미기록")}` : "생성 당시 출력 조건 사본이 없는 과거 버전입니다."}</p>${reason ? `<p class="reference-caution">${esc(reason)}</p>` : ""}`;
+    `<div class="reference-heading"><h2>CMYK 보정 조견표</h2><strong class="reference-status ${reason ? "reference-warning" : ""}">${state}</strong></div>${recordedConditions ? `<p class="reference-conditions">${recordedConditions}</p>` : ""}${reason ? `<p class="reference-caution">${esc(reason)}</p>` : ""}`;
   const passthrough = CHANNELS.filter((c) => !version.tables[c]);
   const note = `각 채널을 독립 변환한 제작 입력값입니다.${passthrough.length ? " " + passthrough.join(" · ") + "는 미보정이며 원본값을 통과시킵니다." : " 보정 적용: C · M · Y · K."} 측정 간격 ${settings.step}% 사이의 값은 내부 보정 곡선을 선형 보간한 뒤 반올림했습니다.`;
   const custom = ![1, 2, 5, 10].includes(step),
