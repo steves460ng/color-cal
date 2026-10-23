@@ -1082,3 +1082,43 @@ h3 {
     line-height: 1;
   }
 }
+
+@media print {
+  #content:has(> .patch-guide) > :not(.patch-guide) {
+    display: none !important;
+  }
+  .guide-print-table {
+    display: table;
+    width: 100%;
+    border-collapse: collapse;
+    border: 1px solid #777;
+    color: black;
+    font-size: 9pt;
+  }
+  .guide-print-table [role="rowgroup"] {
+    display: table-row-group;
+  }
+  .guide-print-table .guide-print-head {
+    display: table-header-group;
+    font-weight: 700;
+  }
+  .guide-print-table [role="row"] {
+    display: table-row;
+    break-inside: avoid;
+  }
+  .guide-print-table [role="cell"],
+  .guide-print-table [role="columnheader"] {
+    display: table-cell;
+    width: 50%;
+    padding: 1.8px 6px;
+    text-align: center;
+    border-bottom: 1px solid #ddd;
+    line-height: 1.2;
+  }
+  .guide-print-table .guide-print-head [role="columnheader"] {
+    border-bottom: 1px solid black;
+  }
+  .guide-print-table .guide-print-major [role="cell"] {
+    border-top: 1px solid #555;
+  }
+}

@@ -15,28 +15,15 @@ function sheetTable(rows, version, print = false) {
 }
 export function renderReferenceTable(project, version, rows, step, reason) {
   const state = reason ? "참고용 · 현재 적용 불가" : "확정 · 사용 가능";
-  const settings = version.settings,
-    conditions = version.conditions;
-  const recordedConditions = conditions
-    ? [
-        ["장비", conditions.printer],
-        ["용지", conditions.paper],
-        ["잉크", conditions.ink],
-      ]
-        .filter(([, value]) => value?.trim())
-        .map(([label, value]) => `${label}: ${esc(value)}`)
-        .join(" · ")
-    : "";
+  const settings = version.settings;
   const metadata = () =>
-    `<div class="reference-heading"><h2>CMYK 보정 조견표</h2><strong class="reference-status ${reason ? "reference-warning" : ""}">${state}</strong></div>${recordedConditions ? `<p class="reference-conditions">${recordedConditions}</p>` : ""}${reason ? `<p class="reference-caution">${esc(reason)}</p>` : ""}`;
-  const passthrough = CHANNELS.filter((c) => !version.tables[c]);
-  const note = `각 채널을 독립 변환한 제작 입력값입니다.${passthrough.length ? " " + passthrough.join(" · ") + "는 미보정이며 원본값을 통과시킵니다." : " 보정 적용: C · M · Y · K."} 측정 간격 ${settings.step}% 사이의 값은 내부 보정 곡선을 선형 보간한 뒤 반올림했습니다.`;
+    `<div class="reference-heading"><h2>CMYK 보정 조견표</h2><strong class="reference-status ${reason ? "reference-warning" : ""}">${state}</strong></div>${reason ? `<p class="reference-caution">${esc(reason)}</p>` : ""}`;
   const custom = ![1, 2, 5, 10].includes(step),
     pages = referencePrintPages(rows);
   return `<section class="card lookup-sheet">
  <form id="reference-settings" class="toolbar no-print"><label for="reference-step">조견표 간격 <select id="reference-step">${[1, 2, 5, 10].map((n) => `<option value="${n}" ${n === step ? "selected" : ""}>${n}%</option>`).join("")}<option value="custom" ${custom ? "selected" : ""}>사용자 지정</option></select></label><label id="reference-custom-label" ${custom ? "" : "hidden"}>간격 (%) <input id="reference-custom" type="number" min="${settings.integer ? 1 : 0.1}" max="100" step="${settings.integer ? 1 : "any"}" value="${step}" required></label><button type="submit">적용</button><button type="button" id="print-reference">조견표 인쇄</button><button type="button" id="export-reference">조견표 CSV</button></form>
- <p class="muted no-print">조견표 간격은 측정 분해능과 별개입니다. 간격을 바꿔도 측정값과 보정 버전은 변경되지 않습니다.</p><div id="reference-error" role="alert"></div>
- <div class="reference-screen">${metadata()}<p class="muted">${note}</p><div class="table-wrap">${sheetTable(rows, version)}</div></div>
- <div class="reference-print" aria-hidden="true">${pages.map((columns, i) => `<section class="reference-print-page">${metadata()}<div class="reference-print-grid">${columns.map((column) => sheetTable(column, version, true)).join("")}</div><footer>${note}<span>${i + 1} / ${pages.length}쪽</span></footer></section>`).join("")}</div>
+ <div id="reference-error" role="alert"></div>
+ <div class="reference-screen">${metadata()}<div class="table-wrap">${sheetTable(rows, version)}</div></div>
+ <div class="reference-print" aria-hidden="true">${pages.map((columns, i) => `<section class="reference-print-page">${metadata()}<div class="reference-print-grid">${columns.map((column) => sheetTable(column, version, true)).join("")}</div><footer><span>${i + 1} / ${pages.length}쪽</span></footer></section>`).join("")}</div>
  </section>`;
 }

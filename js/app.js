@@ -32,6 +32,7 @@ import { backupText, parseBackup, csv, download } from "./storage/backup.js";
 import { drawChart } from "./ui/charts.js";
 import { referenceTable } from "./domain/reference-table.js";
 import { renderReferenceTable } from "./ui/reference-table.js";
+import { renderGuidePrint } from "./ui/guide-print.js";
 import { firstPassReport } from "./domain/linearity.js";
 import { renderLinearityReport } from "./ui/linearity-report.js";
 import { formatInput } from "./ui/formatters.js";
@@ -301,6 +302,7 @@ function guidePage(second) {
     (second ? versionToolbar() + versionNotice(v) : "") +
     tabs(second) +
     `<section class="card patch-guide guide-${c.toLowerCase()}">
+      <div class="guide-screen no-print">
       <div class="card-head"><div><h2>${badge(c)} ${c} · ${names[c]} 단색 패치 ${second ? `· 보정 V${v.number}` : "· 1차 제작"}</h2><span class="muted">현재 채널 ${ts.length}개 · 전체 ${(second ? v.channels : s.channels).length * ts.length}개 · ${s.integer ? "정수" : "소수"} 제작값</span></div><span class="badge">${second ? "2차" : "1차"} 제작</span></div>
       <div class="guide-context"><strong>${c} 채널의 제작 입력값만 변경하세요.</strong><span>${fixed} 채널은 모든 패치에서 0% 고정입니다.</span></div>
       <p class="muted">아래는 패치 제작 수치입니다. Lab 측정 내역과 완료 여부는 <a href="#${second ? "measure2" : "measure1"}">${second ? "2차" : "1차"} 측정 입력</a>에서 확인하세요.</p>
@@ -342,6 +344,7 @@ function guidePage(second) {
           caption: `${second ? "2차" : "1차"} 패치 제작 가이드 · ${c} (${names[c]}) 채널`,
         },
       )}
+      </div>${renderGuidePrint(c, ts, s, second)}
     </section>`
   );
 }
@@ -455,7 +458,8 @@ function selectedReferenceStep(v) {
   }
 }
 function correctionPage() {
-  const advancedOpen = document.querySelector('.correction-advanced')?.open ?? false;
+  const advancedOpen =
+    document.querySelector(".correction-advanced")?.open ?? false;
   const p = project(),
     v = version();
   let sheet = empty(
@@ -484,7 +488,7 @@ function correctionPage() {
     ) +
     (v ? versionToolbar() + versionNotice(v) : "") +
     sheet +
-    `<details class="card no-print correction-advanced" ${advancedOpen?'open':''}><summary>보정 버전 생성·내부 계산값 (고급)</summary><div class="toolbar"><label>계산 범위 <select id="calculate-channel"><option value="all">선택한 전체 채널</option>${p.settings.channels.map((c) => `<option value="${c}">${c} 채널만</option>`).join("")}</select></label><button class="primary" id="calculate">보정값 계산 · 새 버전 생성</button></div><p class="muted">일반 작업은 1차 선형도 리포트를 거쳐 진행합니다. 여기서 새 버전을 만들어도 이전 버전과 측정값은 유지됩니다.</p>
+    `<details class="card no-print correction-advanced" ${advancedOpen ? "open" : ""}><summary>보정 버전 생성·내부 계산값 (고급)</summary><div class="toolbar"><label>계산 범위 <select id="calculate-channel"><option value="all">선택한 전체 채널</option>${p.settings.channels.map((c) => `<option value="${c}">${c} 채널만</option>`).join("")}</select></label><button class="primary" id="calculate">보정값 계산 · 새 버전 생성</button></div><p class="muted">일반 작업은 1차 선형도 리포트를 거쳐 진행합니다. 여기서 새 버전을 만들어도 이전 버전과 측정값은 유지됩니다.</p>
     ${
       v
         ? tabs(true) +

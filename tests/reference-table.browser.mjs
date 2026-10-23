@@ -10,11 +10,11 @@ import {
   convert,
 } from "../js/core.js";
 import { backupText } from "../js/storage/backup.js";
-function fixture(name, integer = true) {
+function fixture(name, integer = true, step = 10) {
   const p = createProject(name);
   p.meta.printer = "가상 장비";
   p.meta.paper = "시험 용지";
-  p.settings = { channels: ["C", "K"], step: 10, integer, precision: 2 };
+  p.settings = { channels: ["C", "K"], step, integer, precision: 2 };
   for (const c of p.settings.channels)
     for (const t of targets(p.settings))
       p.first[key(c, t)] = { L: 100 - (0.8 * t * t) / 100, a: 0, b: 0 };
@@ -68,6 +68,12 @@ try {
   assert.equal(await page.locator(".reference-screen tbody tr").count(), 21);
   assert.equal(await page.locator(".reference-screen thead th").count(), 5);
   assert.equal(await page.locator(".reference-heading p").count(), 0);
+  assert.equal(await page.locator(".reference-conditions").count(), 0);
+  assert.ok(
+    !(await page.locator(".lookup-sheet").textContent()).includes(
+      "각 채널을 독립 변환",
+    ),
+  );
   assert.ok(
     !(await page.locator(".lookup-sheet").textContent()).includes(
       "생성 당시 출력 조건 사본이 없는 과거 버전입니다.",
@@ -203,6 +209,50 @@ try {
       () => document.documentElement.scrollWidth <= innerWidth,
     ),
   );
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  for (const step of [1, 10]) {
+    const guide = fixture(`제작 인쇄 ${step}`, false, step);
+    await load(guide);
+    for (const second of [false, true]) {
+      await go(second ? "guide2" : "guide1");
+      assert.equal(await page.locator(".guide-print").isVisible(), false);
+      await page.emulateMedia({ media: "print" });
+      assert.equal(await page.locator(".guide-print").isVisible(), true);
+      assert.equal(await page.locator(".guide-screen").isVisible(), false);
+      assert.equal(
+        await page.locator("#content > .page-head").isVisible(),
+        false,
+      );
+      assert.deepEqual(
+        await page
+          .locator(".guide-print-table")
+          .first()
+          .locator('[role="columnheader"]')
+          .allTextContents(),
+        ["목표값 (%)", "C 제작값 (%)"],
+      );
+      const cells = (
+        await page.locator('.guide-print-table [role="cell"]').allTextContents()
+      ).map(Number);
+      assert.deepEqual(
+        cells,
+        guide.versions[0].tables.C.flatMap((r) => [
+          r.target,
+          second ? r.production : r.target,
+        ]),
+      );
+      assert.equal(
+        await page.locator(".guide-print .reference-print-page").count(),
+        1,
+      );
+      await page.pdf({
+        path: `test-results/guide-${second ? 2 : 1}-${step}-print.pdf`,
+        preferCSSPageSize: true,
+        printBackground: true,
+      });
+      await page.emulateMedia({ media: "screen" });
+    }
+  }
   assert.deepEqual(errors, []);
   console.log(
     "reference: CMYK 동시 표시, 계산기 일치, 분해능·사용자 간격·설정 복원, 측정/버전 보존, CSV, 101행 인쇄·화면 분리, 미확정 표시, 소수/모바일 PASS",
