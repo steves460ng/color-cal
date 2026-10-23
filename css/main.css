@@ -780,3 +780,32 @@ h3 {
     color: black;
   }
 }
+
+.workflow-next {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 16px;
+  padding: 22px;
+  margin-bottom: 16px;
+  background: #edf1ff;
+  border: 1px solid #d8dff8;
+  border-radius: 10px;
+}
+.workflow-next h2 {
+  margin-bottom: 8px;
+}
+.workflow-next p {
+  margin: 0;
+  max-width: 660px;
+}
+.nav-detail {
+  margin-top: 18px;
+  border-top: 1px solid var(--line);
+}
+@media print {
+  .workflow-next {
+    display: none !important;
+  }
+}

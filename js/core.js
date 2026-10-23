@@ -328,3 +328,23 @@ export function comparison(v, c) {
     };
   });
 }
+
+/** Prepare the selected channels once; revisiting preserves existing second-pass work. */
+export function prepareSecondPass(p) {
+  const missing = p.settings.channels.filter((c) => !firstComplete(p, c));
+  if (missing.length)
+    throw Error(`${missing.join(" · ")} 채널의 1차 측정을 완료하세요.`);
+  const existing = [...p.versions]
+    .reverse()
+    .find(
+      (v) =>
+        v.channels.length === p.settings.channels.length &&
+        p.settings.channels.every((c) => v.channels.includes(c)) &&
+        versionCurrent(p, v),
+    );
+  const version = existing || calculateVersion(p);
+  p.location.versionId = version.id;
+  if (!version.channels.includes(p.location.channel))
+    p.location.channel = version.channels[0];
+  return { version, created: !existing };
+}

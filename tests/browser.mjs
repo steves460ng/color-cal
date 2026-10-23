@@ -39,6 +39,7 @@ try {
   assert.equal(await page.locator("tbody tr").count(), 11);
   assert.ok((await page.locator("tbody tr").nth(5).innerText()).includes("50"));
   await go("measure1");
+  assert.equal(await page.locator("[data-prepare-second]").isDisabled(), true);
   for (let i = 0; i <= 10; i++) {
     const tr = page.locator("tbody tr").nth(i);
     await tr.locator("[data-measure=L]").fill(String(100 - 80 * (i / 10) ** 2));
@@ -69,11 +70,12 @@ try {
   );
   await go("results1");
   assert.equal(await page.locator("canvas").count(), 3);
-  await go("correction");
-  await page.locator("#calculate").click();
+  await go("measure1");
+  assert.equal(await page.locator("[data-prepare-second]").isEnabled(), true);
+  await page.locator("[data-prepare-second]").click();
+  await page.locator('nav a.active[href="#guide2"]').waitFor();
   await page.waitForSelector("#version-select");
   assert.equal(await page.locator("tbody tr").count(), 11);
-  await go("guide2");
   assert.ok((await page.locator("tbody").innerText()).includes("미기록"));
   await go("measure2");
   for (let i = 0; i <= 10; i++) {
@@ -121,6 +123,19 @@ try {
   await go("measure2");
   assert.equal(
     await page.locator("[data-measure=actual]").first().isDisabled(),
+    true,
+  );
+  await go("measure1");
+  await page.locator("[data-prepare-second]").click();
+  await page.locator('nav a.active[href="#guide2"]').waitFor();
+  assert.equal(await page.locator("#version-select option").count(), 1);
+  await go("measure2");
+  assert.equal(
+    await page.locator("[data-measure=actual]").nth(5).inputValue(),
+    "71",
+  );
+  assert.equal(
+    await page.locator("[data-measure=actual]").nth(5).isDisabled(),
     true,
   );
   await go("final");

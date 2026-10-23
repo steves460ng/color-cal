@@ -211,3 +211,28 @@ test("CSV 정밀도 보존 / 정수 제작값 / 특수문자 / 수식 방지", (
   assert.ok(text.includes("'=1+1"));
   assert.ok(text.includes('"-2"'));
 });
+
+test("2차 준비는 최초 자동 계산 후 기존 입력을 보존하여 재사용", async () => {
+  const { prepareSecondPass } = await import("../js/core.js");
+  const p = measured();
+  const first = prepareSecondPass(p);
+  assert.equal(first.created, true);
+  first.version.second["C:50"] = { actual: 71, L: 60, a: 0, b: 0 };
+  const again = prepareSecondPass(p);
+  assert.equal(again.created, false);
+  assert.equal(p.versions.length, 1);
+  assert.equal(again.version.second["C:50"].actual, 71);
+  p.first["C:10"].L = 95;
+  const changed = prepareSecondPass(p);
+  assert.equal(changed.created, true);
+  assert.equal(p.versions.length, 2);
+  assert.deepEqual(changed.version.second, {});
+  assert.equal(first.version.second["C:50"].actual, 71);
+});
+test("미완료 채널이 있으면 2차 준비를 거부하고 버전을 만들지 않음", async () => {
+  const { prepareSecondPass } = await import("../js/core.js");
+  const p = measured(true, ["C", "M"]);
+  delete p.first["M:20"];
+  assert.throws(() => prepareSecondPass(p), /M 채널/);
+  assert.equal(p.versions.length, 0);
+});

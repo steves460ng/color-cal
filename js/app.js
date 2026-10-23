@@ -12,6 +12,7 @@ import {
   production,
   firstComplete,
   calculateVersion,
+  prepareSecondPass,
   versionCurrent,
   secondComplete,
   confirmVersion,
@@ -35,7 +36,7 @@ const routes = [
   ["guide1", "1차 패치 가이드"],
   ["measure1", "1차 측정 입력"],
   ["results1", "1차 측정 결과"],
-  ["correction", "보정값 관리"],
+  ["correction", "보정 테이블·버전 (상세)"],
   ["guide2", "2차 패치 가이드"],
   ["measure2", "2차 측정 입력"],
   ["final", "최종 결과"],
@@ -119,7 +120,7 @@ window.addEventListener("beforeunload", (e) => {
   }
 });
 function heading(title, subtitle, step) {
-  return `<div class="page-head"><div><p class="eyebrow">${step ? `STEP ${String(step).padStart(2, "0")} / 10` : "CMYK CALIBRATION"}</p><h1>${title}</h1><p class="subtitle">${subtitle}</p></div>${project() ? `<span class="badge">정수값 모드 ${project().settings.integer ? "ON" : "OFF"}</span>` : ""}</div>`;
+  return `<div class="page-head"><div><p class="eyebrow">${step ? `STEP ${String(step).padStart(2, "0")} / 9` : "CMYK CALIBRATION"}</p><h1>${title}</h1><p class="subtitle">${subtitle}</p></div>${project() ? `<span class="badge">정수값 모드 ${project().settings.integer ? "ON" : "OFF"}</span>` : ""}</div>`;
 }
 function notice(text, kind = "") {
   return `<div class="notice ${kind}">${text}</div>`;
@@ -148,7 +149,7 @@ function versionToolbar() {
 }
 function versionNotice(v) {
   const p = project();
-  return `${!versionCurrent(p, v) ? notice("현재 설정 또는 1차 데이터가 이 버전과 다릅니다. 아래는 보존된 과거 버전입니다. 실제 적용하려면 보정값 관리에서 새 버전을 만드세요.", "warning") : ""}${v.confirmedAt ? notice(`V${v.number} 확정 · ${date(v.confirmedAt)}. 확정 버전의 제작값·측정값은 잠겨 있습니다. 수정은 새 버전에서 진행하세요.`) : ""}`;
+  return `${!versionCurrent(p, v) ? notice("현재 설정 또는 1차 데이터가 이 버전과 다릅니다. 아래는 보존된 과거 버전입니다. 실제 적용하려면 1차 입력 화면의 2차 측정 준비로 새 버전을 만드세요.", "warning") : ""}${v.confirmedAt ? notice(`V${v.number} 확정 · ${date(v.confirmedAt)}. 확정 버전의 제작값·측정값은 잠겨 있습니다. 수정은 새 버전에서 진행하세요.`) : ""}`;
 }
 function sidebar() {
   const p = project();
@@ -168,12 +169,15 @@ function sidebar() {
   $("#project-meta").textContent = p
     ? `${p.settings.channels.join(" · ")} / ${p.settings.step}% / 정수 ${p.settings.integer ? "ON" : "OFF"}`
     : "프로젝트를 생성해 시작하세요.";
-  $("#navigation").innerHTML = routes
-    .map(
-      ([id, label], i) =>
-        `<a href="#${id}" class="${route === id ? "active" : ""}" ${route === id ? 'aria-current="page"' : ""}><b>${String(i + 1).padStart(2, "0")}</b>${label}</a>`,
-    )
-    .join("");
+  $("#navigation").innerHTML =
+    routes
+      .filter(([id]) => id !== "correction")
+      .map(
+        ([id, label], i) =>
+          `<a href="#${id}" class="${route === id ? "active" : ""}" ${route === id ? 'aria-current="page"' : ""}><b>${String(i + 1).padStart(2, "0")}</b>${label}</a>`,
+      )
+      .join("") +
+    `<a href="#correction" class="nav-detail ${route === "correction" ? "active" : ""}" ${route === "correction" ? 'aria-current="page"' : ""}><b>⋯</b>보정 테이블·버전 (상세)</a>`;
   $("#backup").disabled = !p;
 }
 function render() {
@@ -265,8 +269,8 @@ function guidePage(second) {
     v = version();
   if (second && !v)
     return (
-      heading("2차 패치 가이드", "보정값을 계산한 후 제작할 수 있습니다.", 7) +
-      empty("보정 테이블이 없습니다.", "correction", "보정값 계산하기")
+      heading("2차 패치 가이드", "보정값을 계산한 후 제작할 수 있습니다.", 6) +
+      `<div id="second-preparation">${secondPreparation()}</div><a href="#measure1">1차 측정 입력으로 돌아가기</a>`
     );
   const names = { C: "시안", M: "마젠타", Y: "옐로", K: "블랙" };
   const c = channel(second),
@@ -287,7 +291,7 @@ function guidePage(second) {
     heading(
       `${second ? "2차 보정" : "1차"} 패치 제작 가이드`,
       "아래 수치로 그래픽 프로그램에서 직접 패치를 제작하세요. 패치 이미지나 PDF 파일은 생성하지 않습니다.",
-      second ? 7 : 3,
+      second ? 6 : 3,
     ) +
     (second ? versionToolbar() + versionNotice(v) : "") +
     tabs(second) +
@@ -295,6 +299,7 @@ function guidePage(second) {
       <div class="card-head"><div><h2>${badge(c)} ${c} · ${names[c]} 단색 패치 ${second ? `· 보정 V${v.number}` : "· 1차 제작"}</h2><span class="muted">현재 채널 ${ts.length}개 · 전체 ${(second ? v.channels : s.channels).length * ts.length}개 · ${s.integer ? "정수" : "소수"} 제작값</span></div><span class="badge">${second ? "2차" : "1차"} 제작</span></div>
       <div class="guide-context"><strong>${c} 채널의 제작 입력값만 변경하세요.</strong><span>${fixed} 채널은 모든 패치에서 0% 고정입니다.</span></div>
       <p class="muted">아래는 패치 제작 수치입니다. Lab 측정 내역과 완료 여부는 <a href="#${second ? "measure2" : "measure1"}">${second ? "2차" : "1차"} 측정 입력</a>에서 확인하세요.</p>
+      ${second ? v.warnings.map((w) => notice(esc(w), "warning")).join("") : ""}
       ${notice("용지·잉크·출력 해상도·RIP 및 측색 조건을 두 측정에서 동일하게 유지하세요. 패치 ID와 측정 순서를 함께 기록하고, 충분히 건조한 뒤 측정하세요.")}
       <div class="toolbar no-print"><button id="copy-guide">제작값 복사</button><button id="print-guide">현재 채널 가이드 인쇄</button><a href="#${second ? "measure2" : "measure1"}">측정값 입력 →</a></div>
       ${table(
@@ -352,16 +357,21 @@ function inputCell(field, value, id, c, t, second, disabled) {
         : "유효한 숫자를 입력하세요";
   return `<input id="${id}-${field}" data-measure="${field}" data-target="${t}" data-channel="${c}" data-second="${second}" aria-label="${id} ${field === "actual" ? "실제 제작 입력값" : field + "*"}" type="number" value="${esc(value)}" step="${field === "actual" && version()?.settings.integer ? "1" : "any"}" ${field === "L" || field === "actual" ? 'min="0" max="100"' : ""} ${disabled ? "disabled" : ""} aria-invalid="${!valid}" aria-describedby="${id}-${field}-error"><span class="cell-error" id="${id}-${field}-error" ${valid ? "hidden" : ""}>${msg}</span>`;
 }
+function secondPreparation() {
+  const p = project(),
+    missing = p.settings.channels.filter((c) => !firstComplete(p, c));
+  return `<div class="workflow-next"><div><h2>다음: 2차 보정 패치 제작·측정</h2><p class="muted">${missing.length ? `${missing.join(" · ")} 채널의 1차 측정을 마치면 진행할 수 있습니다.` : "1차 측정 완료. 보정값을 자동 계산하고 2차 제작 가이드로 이동합니다."} 기존 작업 버전이 있으면 이어서 진행합니다.</p></div><button class="primary" data-prepare-second ${missing.length ? "disabled" : ""}>2차 측정 준비 →</button></div>`;
+}
 function measurePage(second) {
   const p = project(),
     v = version();
   if (second && !v)
     return (
-      heading("2차 측정 입력", "적용할 보정 버전이 필요합니다.", 8) +
+      heading("2차 측정 입력", "적용할 보정 버전이 필요합니다.", 7) +
       empty(
-        "보정 테이블을 먼저 생성하세요.",
-        "correction",
-        "보정값 관리로 이동",
+        "1차 측정 후 2차 측정을 준비하세요.",
+        "measure1",
+        "1차 측정 입력으로 이동",
       )
     );
   const c = channel(second),
@@ -377,7 +387,7 @@ function measurePage(second) {
     heading(
       `${second ? "2차" : "1차"} 측정 입력`,
       "측색계의 Lab값을 입력하세요. 변경 사항은 자동 저장됩니다. Tab / Enter로 다음 셀로 이동합니다.",
-      second ? 8 : 4,
+      second ? 7 : 4,
     ) +
     (second ? versionToolbar() + versionNotice(v) : "") +
     tabs(second) +
@@ -397,7 +407,7 @@ function measurePage(second) {
           ready = labValid(m) && (!second || actualValid(m.actual, s));
         return `<tr data-measure-row="${t}">${[id, t, ...(second ? [prodFmt(v.tables[c].find((r) => r.target === t).production, s), inputCell("actual", m.actual, id, c, t, second, v.confirmedAt)] : []), ...["L", "a", "b"].map((f) => inputCell(f, m[f], id, c, t, second, second && v.confirmedAt)), `<span data-row-status class="${ready ? "complete" : "incomplete"}">${ready ? "완료" : "미완료"}</span>`].map((x) => `<td>${x}</td>`).join("")}</tr>`;
       }),
-    )}</section><a href="#${second ? "final" : "results1"}">다음: ${second ? "최종 결과 비교" : "1차 결과 확인"} →</a>`
+    )}</section>${second ? '<a href="#final">다음: 최종 결과 비교 →</a>' : `<div id="second-preparation">${secondPreparation()}</div><a href="#results1">1차 그래프·원본 확인 (선택)</a>`}`
   );
 }
 function graphPanels(includeCorrection = false) {
@@ -425,7 +435,7 @@ function resultsPage() {
           labValid(m) ? "완료" : "미완료",
         ]);
       }),
-    )}</section><a href="#correction">다음: 보정값 계산 →</a>`
+    )}</section><div id="second-preparation">${secondPreparation()}</div>`
   );
 }
 function correctionPage() {
@@ -433,9 +443,8 @@ function correctionPage() {
     v = version();
   return (
     heading(
-      "보정값 관리",
-      "1차 측정값으로 채널별 보정 테이블을 만들고 버전별 제작값을 보존합니다.",
-      6,
+      "보정 테이블·버전 (상세)",
+      "2차 측정 준비에서 보정값은 자동 계산됩니다. 여기서는 테이블 확인·내보내기와 별도 버전 생성을 할 수 있습니다.",
     ) +
     `<section class="card"><h2>새 보정 버전 만들기</h2><div class="toolbar"><label>계산 범위 <select id="calculate-channel"><option value="all">선택한 전체 채널</option>${p.settings.channels.map((c) => `<option value="${c}">${c} 채널만</option>`).join("")}</select></label><button class="primary" id="calculate">보정값 계산 · 새 버전 생성</button></div><p class="muted">${p.settings.channels.map((c) => `${c}: ${firstComplete(p, c) ? "입력 완료" : "미입력 있음"}`).join(" / ")}</p><details><summary>보정 알고리즘과 한계</summary><p>종이색(0%)부터 최대 농도(100%)까지의 ΔE*ab (CIE76)를 0~100%로 정규화합니다. 비단조 측정 곡선은 PAVA 단조 회귀로 정리한 뒤, 선형 목표 계조에 역선형 보간합니다. 0%와 100%는 고정하며 평탄 구간의 정확한 목표값은 해당 입력 구간 중점을 사용합니다. 이는 단색 계조용 경험적 보정으로 ISO 농도·SCTV 표준 구현이나 ICC 색상 일치 보장이 아닙니다. 인쇄장비에 실제 적용하기 전에 2차 측정과 작업자 검토가 필요합니다.</p></details></section>${
       v
@@ -469,7 +478,7 @@ function finalPage() {
     v = version();
   if (!v)
     return (
-      heading("최종 결과", "같은 목표 계조의 1차·2차 측정을 비교합니다.", 9) +
+      heading("최종 결과", "같은 목표 계조의 1차·2차 측정을 비교합니다.", 8) +
       empty("보정 테이블이 없습니다.", "correction", "보정값 관리")
     );
   const c = channel(true),
@@ -481,7 +490,7 @@ function finalPage() {
     heading(
       "최종 결과",
       "기준은 목표 계조입니다. 1차·2차 Lab와 실제 제작 입력값을 함께 검토하세요.",
-      9,
+      8,
     ) +
     versionToolbar() +
     versionNotice(v) +
@@ -531,7 +540,7 @@ function calculatorPage() {
     heading(
       "CMYK 보정 계산기",
       "입력한 CMYK를 각 채널의 확정 보정 테이블로 독립 변환합니다.",
-      10,
+      9,
     ) +
     versionToolbar() +
     (reason ? notice(esc(reason), "warning") : "") +
@@ -823,6 +832,26 @@ function bindPage() {
     } else toast("현재 채널에 저장된 입력 위치가 없습니다.");
   });
   bind("#export-measure", () => measurementExport(route === "measure2"));
+  bind("#second-preparation", async (e) => {
+    const button = e.target.closest("[data-prepare-second]");
+    if (!button || button.disabled) return;
+    button.disabled = true;
+    try {
+      const p = project(),
+        { version: v, created } = prepareSecondPass(p);
+      await persist(p);
+      if (route === "guide2") render();
+      else location.hash = "guide2";
+      toast(
+        created
+          ? `보정 V${v.number} 준비 완료. 가이드로 패치를 제작한 뒤 2차 Lab를 입력하세요.`
+          : `V${v.number}의 기존 2차 작업을 이어갑니다.`,
+      );
+    } catch (error) {
+      button.disabled = false;
+      throw error;
+    }
+  });
   bind("#calculate", async () => {
     const p = project(),
       selection = $("#calculate-channel").value,
@@ -1020,6 +1049,8 @@ function updateMeasurement(input) {
   $("#completion").textContent =
     `${done} / ${ts.length} 완료 (${Math.round((done / ts.length) * 100)}%)`;
   $("#progress-bar").style.width = `${(done / ts.length) * 100}%`;
+  if (!second && $("#second-preparation"))
+    $("#second-preparation").innerHTML = secondPreparation();
   saveSoon(p);
 }
 function calculatorRows() {
