@@ -345,6 +345,9 @@ textarea {
   align-items: center;
   gap: 8px;
 }
+#settings-form > button[type="submit"] {
+  margin-top: 20px;
+}
 .channel-checks {
   display: flex;
   gap: 18px;
