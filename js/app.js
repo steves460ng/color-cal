@@ -1429,6 +1429,15 @@ window.addEventListener("afterprint", () =>
   document.body.classList.remove("printing-reference"),
 );
 window.addEventListener("resize", charts);
+$("#help-manual").addEventListener("click", (e) => {
+  if (e.button !== 0 || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return;
+  e.preventDefault();
+  window.open(
+    e.currentTarget.href,
+    "_blank",
+    "popup,width=1100,height=800,resizable=yes,scrollbars=yes,noopener,noreferrer",
+  );
+});
 $("#project-select").addEventListener("change", (e) => {
   currentId = e.target.value;
   location.hash = project().location.route;
