@@ -31,9 +31,35 @@ try {
   await page.locator("[name=printer]").fill("시험 장비");
   await page.getByRole("button", { name: "정보 저장", exact: true }).click();
   await go("settings");
+  const summary = () => page.locator("#settings-summary strong").allTextContents();
+  assert.deepEqual(await summary(), ["4", "21", "84", "정수"]);
+  for (const [step, patches, total] of [
+    ["1", "101", "404"],
+    ["2", "51", "204"],
+    ["5", "21", "84"],
+    ["10", "11", "44"],
+  ]) {
+    await page.locator("#step-preset").selectOption(step);
+    assert.deepEqual(await summary(), ["4", patches, total, "정수"]);
+  }
+  await page.locator("[name=integer]").uncheck();
+  assert.deepEqual(await summary(), ["4", "11", "44", "소수"]);
+  assert.equal(await page.locator(".page-head .badge").innerText(), "정수값 모드 OFF");
+  await saved();
+  await page.reload();
+  await page.locator("#settings-form").waitFor();
+  assert.equal(await page.locator("#step-preset").inputValue(), "5");
+  assert.deepEqual(await summary(), ["4", "21", "84", "정수"]);
+  for (const c of ["C", "M", "Y", "K"])
+    await page.locator(`[name=channels][value=${c}]`).uncheck();
+  assert.deepEqual(await summary(), ["0", "21", "0", "정수"]);
+  await page.locator("[name=channels][value=C]").check();
+  assert.deepEqual(await summary(), ["1", "21", "21", "정수"]);
+  assert.equal(await page.locator("#settings-summary .metric").first().locator("span").last().innerText(), "C");
   for (const c of ["M", "Y", "K"])
     await page.locator(`[name=channels][value=${c}]`).uncheck();
   await page.locator("#step-preset").selectOption("10");
+  assert.deepEqual(await summary(), ["1", "11", "11", "정수"]);
   await page.getByRole("button", { name: "측정 설정 저장" }).click();
   await go("guide1");
   assert.equal(await page.locator("tbody tr").count(), 11);

@@ -257,9 +257,13 @@ function projectsPage() {
     } `
   );
 }
+function settingsMetrics(s, patchCount) {
+  return `<div class="metric"><span>선택 채널</span><strong>${s.channels.length}</strong><span>${s.channels.join(" · ")}</span></div><div class="metric"><span>채널당 패치</span><strong>${patchCount}</strong><span>0%와 100% 포함</span></div><div class="metric"><span>전체 패치</span><strong>${patchCount * s.channels.length}</strong><span>측정 단계별</span></div><div class="metric"><span>제작값 형식</span><strong>${s.integer ? "정수" : "소수"}</strong><span>내부 계산 정밀도 보존</span></div>`;
+}
 function settingsPage() {
   const p = project(),
     s = p.settings,
+    steps = [1, 2, 5, 10],
     ts = targets(s);
   return (
     heading(
@@ -267,7 +271,7 @@ function settingsPage() {
       "사용할 채널과 패치 간격을 정하세요. 각 채널은 다른 세 채널을 0%로 고정해 측정합니다.",
       2,
     ) +
-    `<div class="metrics"><div class="metric"><span>선택 채널</span><strong>${s.channels.length}</strong><span>${s.channels.join(" · ")}</span></div><div class="metric"><span>채널당 패치</span><strong>${ts.length}</strong><span>0%와 100% 포함</span></div><div class="metric"><span>전체 패치</span><strong>${ts.length * s.channels.length}</strong><span>측정 단계별</span></div><div class="metric"><span>제작값 형식</span><strong>${s.integer ? "정수" : "소수"}</strong><span>내부 계산 정밀도 보존</span></div></div><section class="card"><h2>채널 및 정밀도</h2><form id="settings-form"><div class="channel-checks">${CHANNELS.map((c) => `<label class="check"><input type="checkbox" name="channels" value="${c}" ${s.channels.includes(c) ? "checked" : ""}>${badge(c)}</label>`).join("")}</div><div class="grid"><label class="field">패치 증분<select id="step-preset"><option value="custom">사용자 지정</option>${[1, 2, 5, 10].map((n) => `<option value="${n}" ${s.step === n ? "selected" : ""}>${n}%</option>`).join("")}</select></label><label class="field">사용자 지정 증분 (%)<input type="number" name="step" min="0.1" max="100" step="any" value="${s.step}" required></label><label class="field">소수 모드 제작 정밀도<select name="precision">${[0, 1, 2, 3, 4].map((n) => `<option value="${n}" ${s.precision === n ? "selected" : ""}>소수점 ${n}자리</option>`).join("")}</select></label><label class="check"><input type="checkbox" name="integer" ${s.integer ? "checked" : ""}>정수값 모드 (Integer CMYK Mode)</label></div>${notice("설정을 바꿔도 이전 1차 원본과 버전별 2차 데이터는 보존됩니다. 기존 버전의 제작값·검증 결과는 다시 계산하지 않습니다. 새 설정은 새 보정 버전을 만들어 제작·측정한 뒤 적용하세요.", "warning")}<button class="primary" type="submit">측정 설정 저장</button></form></section><a href="#guide1">다음: 1차 패치 제작 가이드 →</a>`
+    `<div id="settings-summary" class="metrics" aria-live="polite">${settingsMetrics(s, ts.length)}</div><section class="card"><h2>채널 및 정밀도</h2><form id="settings-form"><div class="channel-checks">${CHANNELS.map((c) => `<label class="check"><input type="checkbox" name="channels" value="${c}" ${s.channels.includes(c) ? "checked" : ""}>${badge(c)}</label>`).join("")}</div><div class="grid"><label class="field">패치 증분<select id="step-preset" name="step" required>${steps.includes(s.step) ? "" : '<option value="" disabled selected>패치 증분 선택</option>'}${steps.map((n) => `<option value="${n}" ${s.step === n ? "selected" : ""}>${n}%</option>`).join("")}</select></label><label class="field">소수 모드 제작 정밀도<select name="precision">${[0, 1, 2, 3, 4].map((n) => `<option value="${n}" ${s.precision === n ? "selected" : ""}>소수점 ${n}자리</option>`).join("")}</select></label><label class="check"><input type="checkbox" name="integer" ${s.integer ? "checked" : ""}>정수값 모드 (Integer CMYK Mode)</label></div>${notice("설정을 바꿔도 이전 1차 원본과 버전별 2차 데이터는 보존됩니다. 기존 버전의 제작값·검증 결과는 다시 계산하지 않습니다. 새 설정은 새 보정 버전을 만들어 제작·측정한 뒤 적용하세요.", "warning")}<button class="primary" type="submit">측정 설정 저장</button></form></section><a href="#guide1">다음: 1차 패치 제작 가이드 →</a>`
   );
 }
 function guidePage(second) {
@@ -796,10 +800,19 @@ function bindPage() {
     toast("프로젝트를 삭제했습니다.");
   });
   bind(
-    "#step-preset",
+    "#settings-form",
     (e) => {
-      if (e.target.value !== "custom")
-        $("#settings-form [name=step]").value = e.target.value;
+      const saved = project().settings,
+        data = new FormData(e.currentTarget),
+        step = Number(data.get("step")) || saved.step,
+        draft = {
+          channels: data.getAll("channels"),
+          integer: data.has("integer"),
+        },
+        patchCount = targets({ ...saved, step }).length;
+      $("#settings-summary").innerHTML = settingsMetrics(draft, patchCount);
+      $(".page-head .badge").textContent =
+        `정수값 모드 ${draft.integer ? "ON" : "OFF"}`;
     },
     "change",
   );
